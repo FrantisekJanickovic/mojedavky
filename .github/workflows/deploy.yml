@@ -59,6 +59,8 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.pages.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.pages.outputs.page_url }}
     steps:
       - name: Deploy
         id: pages
@@ -74,28 +76,49 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      # Two different claims, so two checks where possible.
-      #
-      # The Pages URL proves the build that just went out is being served. The
-      # production domain proves the DNS and the Pages custom-domain setting
-      # actually point at it — either can be wrong while the deployment itself
-      # is perfect, and the domain is the only one of the two a visitor will
-      # ever type.
-      - name: Check the Pages URL
-        run: node scripts/smoke-site.mjs "${{ needs.deploy.outputs.page_url || 'https://frantisekjanickovic.github.io/mojedavky/' }}"
-        continue-on-error: true
+      # One address, not two. Once a custom domain is set, the github.io URL
+      # just redirects to it, so checking both only tested the same site twice.
+      # The domain is also the only address a visitor will ever type.
+      - name: Check the live site
+        env:
+          URL: ${{ vars.PRODUCTION_URL || needs.deploy.outputs.page_url }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "No address to check: neither PRODUCTION_URL nor the Pages URL is set." >&2
+            exit 1
+          fi
 
-      - name: Check the production domain
-        if: vars.PRODUCTION_URL != ''
-        run: node scripts/smoke-site.mjs "${{ vars.PRODUCTION_URL }}"
+          set +e
+          node scripts/smoke-site.mjs "$URL"
+          status=$?
+          set -e
 
-      - name: Warn when the production domain is not configured
+          # Exit 3 means the site is correct but TLS is not up yet, which is
+          # the normal state for the first hours after a domain is attached.
+          # Failing the run for that trains people to ignore red builds.
+          if [ "$status" -eq 3 ]; then
+            {
+              echo "### Deployed, but not on HTTPS yet"
+              echo
+              echo "\`$URL\` serves the right site over plain HTTP and refuses TLS."
+              echo "GitHub issues the certificate after it verifies the DNS, which can"
+              echo "take several hours."
+              echo
+              echo "When Settings → Pages offers **Enforce HTTPS**, tick it. This check"
+              echo "starts failing for real once the certificate exists and then breaks."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          exit "$status"
+
+      - name: Note that the custom domain was not checked
         if: vars.PRODUCTION_URL == ''
         run: |
           {
-            echo "### Production domain not checked"
+            echo "### Custom domain not checked"
             echo
-            echo "The repository variable \`PRODUCTION_URL\` is not set, so the"
-            echo "custom domain was not verified. Set it under Settings →"
-            echo "Secrets and variables → Actions → Variables."
+            echo "The repository variable \`PRODUCTION_URL\` is not set, so the check"
+            echo "above ran against the Pages URL instead of the real domain. Set it"
+            echo "under Settings → Secrets and variables → Actions → Variables."
           } >> "$GITHUB_STEP_SUMMARY"

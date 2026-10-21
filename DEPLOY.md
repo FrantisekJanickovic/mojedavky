@@ -60,14 +60,31 @@ Optionally the IPv6 equivalents as well, which GitHub recommends alongside the
 @   AAAA   2606:50c0:8003::153
 ```
 
-And `www` as a `CNAME` to the account, **without** the repository name:
+GitHub's own documentation suggests a `CNAME` for `www`, and on many registrars
+that is the better record. It is not an option at every one of them. WebSupport,
+where this domain lives, refuses a `CNAME` at a name that already has records —
+and a wildcard `*` record counts, so the conflict shows up even when nothing
+named `www` is visible in the zone.
+
+The way out is the same four `A` records again, which work everywhere:
 
 ```
-www   CNAME   frantisekjanickovic.github.io
+www   A   185.199.108.153
+www   A   185.199.109.153
+www   A   185.199.110.153
+www   A   185.199.111.153
 ```
+
+Eight GitHub records in all, four on the apex and four on `www`. Add them; do
+not rename the apex ones, or the apex stops resolving.
 
 Do not point `www` at the `*.pages.github.io` address shown in the Pages
 settings panel.
+
+Leave every mail record alone. On this zone that means `admin`, `mail`,
+`webmail`, `smtp`, `pop3` and `imap`, plus the `autodiscover` and `autoconfig`
+aliases. Repointing the apex does not touch mail, but repointing `MX` or those
+hosts does, and the failure is silent until somebody's mail bounces.
 
 ### 4. One repository variable
 
@@ -118,6 +135,21 @@ never saved, or an old deployment is still live.
 It also checks two things that would be quiet failures: that the bundle contains
 the rules at all, and that it carries no development-mode marker, since
 development mode is what switches the verification and maturity gates off.
+
+It distinguishes three outcomes, because "no certificate yet" and "the site is
+wrong" deserve different reactions:
+
+| Exit | Meaning | The run |
+|---|---|---|
+| 0 | everything served and correct | passes |
+| 3 | correct over HTTP, but TLS refused | passes, with a warning in the summary |
+| 1 | wrong, missing, or a placeholder page | fails |
+
+Exit 3 is the first hours after a domain is attached, while GitHub provisions
+the certificate. Failing the run for that would teach everybody to ignore a red
+build, which costs more than it saves. It is not a blanket exemption: the site
+still has to serve the right content over HTTP, so a broken deployment fails
+whether or not TLS is up.
 
 Run it against anything, including a local build:
 
