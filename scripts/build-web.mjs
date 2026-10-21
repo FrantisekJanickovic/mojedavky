@@ -15,6 +15,7 @@
 
 import { build } from 'esbuild';
 import { mkdir, copyFile, stat } from 'node:fs/promises';
+import { generatedPathFor } from './compile-rules.mjs';
 
 const BUDGET_KB = 40;
 
@@ -33,6 +34,13 @@ const result = await build({
 });
 
 await copyFile('web/index.html', 'dist/index.html');
+
+// The rule pack is bundled into app.js for speed, and published here as well
+// so that anybody can read the numbers this site answered with, and check them
+// against the decree, without reading the bundle. It is also the artifact a
+// future runtime-loaded pack would be fetched from.
+await mkdir('dist/rules', { recursive: true });
+await copyFile(generatedPathFor('sk'), 'dist/rules/sk.json');
 
 const { size } = await stat('dist/app.js');
 const kb = size / 1024;

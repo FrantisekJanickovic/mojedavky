@@ -15,13 +15,34 @@ export interface ParameterValue {
   value: number;
 }
 
+/**
+ * What kind of quantity a parameter is.
+ *
+ * Without this nothing distinguishes €30 a month from an age limit of 25, and
+ * a results page that formats every number as euros would say a child is
+ * "25 €" old.
+ */
+export type ParameterUnit = 'eur' | 'years' | 'count' | 'percent';
+
 export interface ParameterDefinition {
   /** Dot path, e.g. `pridavok.zakladna-suma`. */
   path: string;
   /** What this number is, in one line. */
   description: string;
+  unit: ParameterUnit;
   /** Where the number comes from. A URL to the act, decree or official table. */
   source: string;
+  /** Key of that source within the pack, for grouping and for fixing links. */
+  sourceKey?: string;
+  /**
+   * True when the number is a stand-in nobody has supplied yet.
+   *
+   * A placeholder is usually written as zero, and zero is also a legitimate
+   * value for some parameters, so the distinction cannot be inferred from the
+   * number. Saying it outright is what lets the integrity report separate "we
+   * have not filled this in" from "this really is nil".
+   */
+  placeholder?: boolean;
   /**
    * Set to true only once a human has opened `source` and confirmed every
    * value below against it. Until then the engine will not answer with it in

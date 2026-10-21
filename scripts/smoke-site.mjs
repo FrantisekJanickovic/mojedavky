@@ -158,6 +158,34 @@ if (bundle.error) {
   }
 }
 
+// --- the published rule pack ----------------------------------------------
+//
+// A real network request against the live site, which the page itself does not
+// make: the engine is bundled in, so the screening needs nothing fetched. This
+// checks that the pack is published and readable, and that the version served
+// is the one that was built.
+
+const packResponse = await get('/rules/sk.json');
+
+if (packResponse.error) {
+  fail(`GET ${packResponse.url} failed: ${describe(packResponse.error)}`);
+} else if (!packResponse.response.ok) {
+  fail(`GET ${packResponse.url} returned ${packResponse.response.status}`);
+} else {
+  try {
+    const pack = JSON.parse(packResponse.body);
+    pass(`the rule pack is published (version ${pack.version}, ${pack.parameters.length} parameters)`);
+
+    // Serving a pack whose numbers nobody has checked is the current, correct
+    // state. Serving one that *claims* to be checked when the gates are still
+    // withholding every answer would mean the two had drifted apart.
+    const verified = pack.parameters.filter((p) => p.verified).length;
+    console.log(`      ${verified} of ${pack.parameters.length} parameters verified`);
+  } catch (error) {
+    fail(`the published rule pack is not valid JSON: ${error.message}`);
+  }
+}
+
 // --- things that must NOT be there ----------------------------------------
 
 if (/google-analytics|googletagmanager|hotjar|facebook\.net/i.test(page.body)) {

@@ -7,6 +7,7 @@ const defs: ParameterDefinition[] = [
   {
     path: 'test.amount',
     description: 'Verified test amount.',
+    unit: 'eur',
     source: 'https://example.test/',
     verified: true,
     values: [
@@ -18,6 +19,7 @@ const defs: ParameterDefinition[] = [
   {
     path: 'test.unchecked',
     description: 'Unverified test amount.',
+    unit: 'eur',
     source: 'https://example.test/',
     verified: false,
     values: [{ from: '2025-01-01', value: 99 }],

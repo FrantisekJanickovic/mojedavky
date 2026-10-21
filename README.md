@@ -18,7 +18,7 @@ What is done:
 - "below the line" prompts for entitlements the engine cannot decide
 - the question graph: asks what eliminates, skips what cannot matter
 - the browser app, 24 kB, no framework, nothing stored
-- 118 tests, type-checked, built and smoke-tested on every push
+- 139 tests, type-checked, built and smoke-tested on every push
 
 What is not:
 
@@ -62,13 +62,24 @@ step — never `not-eligible`. Not knowing is not the same as refusing.
 
 One at a time, with a test for each:
 
-1. Open the parameter's `source` in `src/rules/sk/parameters.ts`.
+1. Open the parameter's `source` in `rules/sk/parameters.yaml`. The numbers live
+   in YAML, not TypeScript, so checking a figure against a decree does not mean
+   reading code.
 2. Confirm every value **and every commencement date**. The act fixes the
    entitlement; the amounts are set by decree and re-set most years, often from
    1 January or 1 July. The act alone will not give you the current figure.
-3. Set `verified: true` and fill in `verifiedBy` and `verifiedOn`.
-4. Add a worked example to the test suite, taken from official guidance rather
+3. Set `verified: true`, fill in `verified_by` and `verified_on`, and drop
+   `placeholder` if it was there.
+4. Run `npm run rules`. It validates the file and recompiles the pack; the
+   committed JSON is what the app actually uses, and a test fails if the two
+   drift apart.
+5. Add a worked example to the test suite, taken from official guidance rather
    than from your own reading of the rule.
+
+The validator rejects a key it does not recognise rather than ignoring it. A
+silently dropped `verifed: true` would leave a number unchecked while looking
+signed off, and the first sign of it would be a wrong answer given to somebody
+about their rent.
 
 Promoting a benefit from `draft` to `reviewed` is a bigger step and needs
 somebody who knows the practice, not just the text. The exceptions are where
@@ -106,13 +117,16 @@ be reproducible in front of a caseworker.
 ## Layout
 
 ```
+rules/sk/
+└── parameters.yaml   THE NUMBERS. Source of truth, edited by hand.
 src/
 ├── engine/           jurisdiction-agnostic
 │   ├── types.ts      situation, outcome, lead, the gates' statuses
 │   ├── parameters.ts dated parameter resolution
 │   └── simulate.ts   evaluation, trace, lead suppression
 ├── rules/sk/         the Slovak package
-│   ├── parameters.ts every value, its source, its verification state
+│   ├── parameters.ts adapts the compiled pack to the engine's types
+│   ├── generated/    compiled from the YAML — never edited by hand
 │   ├── benefits/     one file per benefit
 │   ├── leads.ts      below-the-line prompts
 │   └── offices.ts    where to claim, what to bring
@@ -121,9 +135,15 @@ src/
 ├── server/screen.ts  HTTP handler — NOT deployed, seed of the batch product
 └── index.ts          screenSk()
 web/index.html        page shell, styles inline
-scripts/              build and post-deploy checks
-tests/                118 tests
+scripts/              rule compiler, build, post-deploy checks
+tests/                139 tests
 ```
+
+Numbers in YAML, logic in TypeScript. The amounts change yearly by decree and
+the logic changes rarely by amendment, so they move at different speeds and
+belong in different files. The logic stays code because the exceptions are
+where the damage lives, and a declarative format expressive enough to carry
+Slovak social law ends up being a programming language with worse tooling.
 
 Czechia goes in `src/rules/cz/`, not behind a flag in `sk/`. Entities,
 parameters and the structure of the benefits all differ; a shared package would
@@ -134,10 +154,11 @@ Separate packages also mean a Czech mistake cannot break Slovakia.
 
 ```bash
 npm install
-npm test          # 118 tests
+npm run rules     # validate the YAML and compile the rule pack
+npm test          # 139 tests
 npm run typecheck
 npm run build     # static site into dist/, with a size budget
-npm run verify    # all three
+npm run verify    # all of the above, in order
 npm run dev       # build and serve dist/ locally
 ```
 

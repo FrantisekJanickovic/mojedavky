@@ -5,16 +5,20 @@
   "type": "module",
   "description": "Combined social benefit entitlement screening (SK, later CZ).",
   "scripts": {
+    "rules": "node scripts/compile-rules.mjs",
+    "rules:check": "node scripts/compile-rules.mjs --check",
     "build": "node scripts/build-web.mjs",
     "dev": "node scripts/build-web.mjs && npx --yes serve dist",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "verify": "tsc --noEmit && vitest run && node scripts/build-web.mjs"
+    "verify": "node scripts/compile-rules.mjs --check && tsc --noEmit && vitest run && node scripts/build-web.mjs"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.9.0",
     "esbuild": "^0.24.0",
+    "js-yaml": "^5.5.0",
     "jsdom": "^25.0.1",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"

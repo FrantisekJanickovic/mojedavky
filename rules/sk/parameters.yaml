@@ -1,0 +1,133 @@
+# Slovak parameters — the source of truth.
+#
+# This file, not the TypeScript, is where the numbers live. `npm run rules`
+# validates it and compiles it to src/rules/sk/generated/parameters.json, which
+# is committed so that every change to a number shows up as a reviewable diff.
+#
+# It is YAML so that somebody who verifies the law does not have to read
+# TypeScript to do it. Rules — who qualifies, how an amount is computed — stay
+# in code. That split is deliberate: the numbers change yearly by decree and
+# the logic changes rarely by amendment, and the exceptions in the logic are
+# where a declarative format would quietly lose them.
+#
+# Verifying one parameter:
+#   1. open its source
+#   2. confirm every value AND every `from` date against it
+#   3. set `verified: true` and fill in verified_by / verified_on
+#   4. remove `placeholder: true` if present
+#   5. add a worked example to the test suite
+#
+# Which document to trust: the act fixes the entitlement, the amounts are set
+# by decree (opatrenie / nariadenie vlády) and re-set most years, usually from
+# 1 January or 1 July. The act alone will not give you the current figure.
+
+jurisdiction: sk
+
+# Bumped whenever any value below changes. The app shows it, so a person can
+# tell which pack answered them and a past screening can be reproduced.
+version: "2026.10.1"
+
+# Every parameter cites one of these by key rather than repeating a URL, so a
+# dead link is fixed in one place.
+sources:
+  act-600-2003:
+    title: Zákon č. 600/2003 Z. z. o prídavku na dieťa
+    url: https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2003/600/
+  act-601-2003:
+    title: Zákon č. 601/2003 Z. z. o životnom minime
+    url: https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2003/601/
+  act-417-2013:
+    title: Zákon č. 417/2013 Z. z. o pomoci v hmotnej núdzi
+    url: https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2013/417/
+
+parameters:
+  # --- Prídavok na dieťa ---------------------------------------------------
+  - path: pridavok.zakladna-suma
+    description: Monthly child allowance per dependent child.
+    unit: eur
+    source: act-600-2003
+    verified: false
+    values:
+      # TRANSCRIBED FROM A SECONDARY SOURCE, UNCHECKED.
+      # Confirm against the decree in force, not the act.
+      - from: "2026-01-01"
+        value: 30.00
+
+  - path: pridavok.priplatok
+    description: >-
+      Supplement to the child allowance where no parent can claim the child tax
+      bonus for that child.
+    unit: eur
+    source: act-600-2003
+    verified: false
+    placeholder: true
+    values:
+      - from: "2026-01-01"
+        value: 0
+
+  - path: pridavok.vek-max
+    description: Upper age limit for a dependent child, in whole years.
+    unit: years
+    source: act-600-2003
+    verified: false
+    values:
+      - from: "2026-01-01"
+        value: 25
+
+  # --- Životné minimum -----------------------------------------------------
+  # Re-set annually, usually with effect from 1 July. Three rates that are
+  # always changed together, so verify all three in one sitting.
+  - path: zivotne-minimum.jedna-plnoleta-osoba
+    description: Subsistence minimum for one adult per month.
+    unit: eur
+    source: act-601-2003
+    verified: false
+    placeholder: true
+    values:
+      - from: "2026-07-01"
+        value: 0
+
+  - path: zivotne-minimum.dalsia-plnoleta-osoba
+    description: Subsistence minimum for each further jointly assessed adult.
+    unit: eur
+    source: act-601-2003
+    verified: false
+    placeholder: true
+    values:
+      - from: "2026-07-01"
+        value: 0
+
+  - path: zivotne-minimum.nezaopatrene-dieta
+    description: Subsistence minimum for each dependent child.
+    unit: eur
+    source: act-601-2003
+    verified: false
+    placeholder: true
+    values:
+      - from: "2026-07-01"
+        value: 0
+
+  # --- Príspevok na bývanie (v hmotnej núdzi) ------------------------------
+  - path: byvanie.prispevok-jedna-osoba
+    description: >-
+      Housing allowance within material-need assistance, single-person
+      household.
+    unit: eur
+    source: act-417-2013
+    verified: false
+    placeholder: true
+    values:
+      - from: "2026-01-01"
+        value: 0
+
+  - path: byvanie.prispevok-viac-osob
+    description: >-
+      Housing allowance within material-need assistance, household of two or
+      more.
+    unit: eur
+    source: act-417-2013
+    verified: false
+    placeholder: true
+    values:
+      - from: "2026-01-01"
+        value: 0

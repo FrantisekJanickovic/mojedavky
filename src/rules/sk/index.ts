@@ -20,6 +20,11 @@ export const skRegistry: Registry = {
   parameters: skParameters,
 };
 
-export { skParameters, skParameterDefinitions, skSources } from './parameters.js';
+export {
+  skParameters,
+  skParameterDefinitions,
+  skSources,
+  skRulePackVersion,
+} from './parameters.js';
 export { skOffices, officeFor, documentsFor } from './offices.js';
 export { skLeads } from './leads.js';

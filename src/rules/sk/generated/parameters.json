@@ -1,0 +1,139 @@
+{
+  "jurisdiction": "sk",
+  "version": "2026.10.1",
+  "generatedFrom": "rules/sk/parameters.yaml",
+  "sources": {
+    "act-600-2003": {
+      "title": "Zákon č. 600/2003 Z. z. o prídavku na dieťa",
+      "url": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2003/600/"
+    },
+    "act-601-2003": {
+      "title": "Zákon č. 601/2003 Z. z. o životnom minime",
+      "url": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2003/601/"
+    },
+    "act-417-2013": {
+      "title": "Zákon č. 417/2013 Z. z. o pomoci v hmotnej núdzi",
+      "url": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2013/417/"
+    }
+  },
+  "parameters": [
+    {
+      "path": "pridavok.zakladna-suma",
+      "description": "Monthly child allowance per dependent child.",
+      "unit": "eur",
+      "sourceKey": "act-600-2003",
+      "source": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2003/600/",
+      "verified": false,
+      "values": [
+        {
+          "from": "2026-01-01",
+          "value": 30
+        }
+      ]
+    },
+    {
+      "path": "pridavok.priplatok",
+      "description": "Supplement to the child allowance where no parent can claim the child tax bonus for that child.",
+      "unit": "eur",
+      "sourceKey": "act-600-2003",
+      "source": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2003/600/",
+      "verified": false,
+      "values": [
+        {
+          "from": "2026-01-01",
+          "value": 0
+        }
+      ],
+      "placeholder": true
+    },
+    {
+      "path": "pridavok.vek-max",
+      "description": "Upper age limit for a dependent child, in whole years.",
+      "unit": "years",
+      "sourceKey": "act-600-2003",
+      "source": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2003/600/",
+      "verified": false,
+      "values": [
+        {
+          "from": "2026-01-01",
+          "value": 25
+        }
+      ]
+    },
+    {
+      "path": "zivotne-minimum.jedna-plnoleta-osoba",
+      "description": "Subsistence minimum for one adult per month.",
+      "unit": "eur",
+      "sourceKey": "act-601-2003",
+      "source": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2003/601/",
+      "verified": false,
+      "values": [
+        {
+          "from": "2026-07-01",
+          "value": 0
+        }
+      ],
+      "placeholder": true
+    },
+    {
+      "path": "zivotne-minimum.dalsia-plnoleta-osoba",
+      "description": "Subsistence minimum for each further jointly assessed adult.",
+      "unit": "eur",
+      "sourceKey": "act-601-2003",
+      "source": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2003/601/",
+      "verified": false,
+      "values": [
+        {
+          "from": "2026-07-01",
+          "value": 0
+        }
+      ],
+      "placeholder": true
+    },
+    {
+      "path": "zivotne-minimum.nezaopatrene-dieta",
+      "description": "Subsistence minimum for each dependent child.",
+      "unit": "eur",
+      "sourceKey": "act-601-2003",
+      "source": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2003/601/",
+      "verified": false,
+      "values": [
+        {
+          "from": "2026-07-01",
+          "value": 0
+        }
+      ],
+      "placeholder": true
+    },
+    {
+      "path": "byvanie.prispevok-jedna-osoba",
+      "description": "Housing allowance within material-need assistance, single-person household.",
+      "unit": "eur",
+      "sourceKey": "act-417-2013",
+      "source": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2013/417/",
+      "verified": false,
+      "values": [
+        {
+          "from": "2026-01-01",
+          "value": 0
+        }
+      ],
+      "placeholder": true
+    },
+    {
+      "path": "byvanie.prispevok-viac-osob",
+      "description": "Housing allowance within material-need assistance, household of two or more.",
+      "unit": "eur",
+      "sourceKey": "act-417-2013",
+      "source": "https://www.slov-lex.sk/ezbierky/pravne-predpisy/SK/ZZ/2013/417/",
+      "verified": false,
+      "values": [
+        {
+          "from": "2026-01-01",
+          "value": 0
+        }
+      ],
+      "placeholder": true
+    }
+  ]
+}
