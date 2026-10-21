@@ -96,5 +96,27 @@ jobs:
       # A deployed build must still refuse to answer while the rule base is
       # unverified. If this ever starts failing, either the law got verified
       # (good, update the check) or a gate was removed (stop and find out why).
-      - name: Smoke test the gates on the live deployment
+      # Two different claims, so two checks.
+      #
+      # The deployment URL proves the build that just went out behaves. The
+      # production domain proves the alias actually points at it — an alias can
+      # be stale or misconfigured while the deployment itself is perfect, and
+      # the domain is the only one of the two that a visitor will ever type.
+      - name: Smoke test the gates on the new deployment
         run: node scripts/smoke-gates.mjs "${{ steps.deploy.outputs.url }}"
+
+      - name: Smoke test the gates on the production domain
+        if: vars.PRODUCTION_URL != ''
+        run: node scripts/smoke-gates.mjs "${{ vars.PRODUCTION_URL }}"
+
+      - name: Warn when the production domain is not configured
+        if: vars.PRODUCTION_URL == ''
+        run: |
+          {
+            echo "### Production domain not checked"
+            echo
+            echo "The repository variable \`PRODUCTION_URL\` is not set, so only the"
+            echo "deployment URL was smoke tested. Set it under Settings →"
+            echo "Secrets and variables → Actions → Variables to also verify that"
+            echo "the domain alias points at this deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
