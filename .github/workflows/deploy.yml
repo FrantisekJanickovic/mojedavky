@@ -1,0 +1,100 @@
+name: Deploy
+
+# Deployment is gated on the test suite, deliberately.
+#
+# Vercel's own Git integration deploys on push regardless of whether CI passed,
+# which is fine for a marketing site and wrong for this. The suite is what
+# enforces the verification and maturity gates — the checks that stop the app
+# telling somebody they are entitled to money we have not confirmed. A deploy
+# that can outrun those tests defeats the point of having them.
+#
+# So Vercel's Git integration should be left DISCONNECTED for this project and
+# the deploy driven from here instead. See DEPLOY.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  # One deploy at a time per branch; a newer push supersedes an in-flight one.
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  preview:
+    name: Preview deploy
+    needs: verify
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: preview
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Pull Vercel environment
+        run: npx vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Build
+        run: npx vercel build --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy
+        id: deploy
+        run: |
+          url=$(npx vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
+
+  production:
+    name: Production deploy
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Pull Vercel environment
+        run: npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Build
+        run: npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy
+        id: deploy
+        run: |
+          url=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Production: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      # A deployed build must still refuse to answer while the rule base is
+      # unverified. If this ever starts failing, either the law got verified
+      # (good, update the check) or a gate was removed (stop and find out why).
+      - name: Smoke test the gates on the live deployment
+        run: node scripts/smoke-gates.mjs "${{ steps.deploy.outputs.url }}"
