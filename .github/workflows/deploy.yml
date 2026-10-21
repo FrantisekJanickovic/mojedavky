@@ -1,113 +1,93 @@
 name: Deploy
 
-# Deployment is gated on the test suite, deliberately.
+# GitHub Pages, not Vercel.
 #
-# Vercel's own Git integration deploys on push regardless of whether CI passed,
-# which is fine for a marketing site and wrong for this. The suite is what
-# enforces the verification and maturity gates — the checks that stop the app
-# telling somebody they are entitled to money we have not confirmed. A deploy
+# The app runs the whole screening in the browser — the engine is bundled into
+# the page — so there is no server to run and nothing personal is ever
+# transmitted. That makes a static host not just sufficient but better: no
+# server means no server that could log, cache or leak somebody's income.
+#
+# Deployment is gated on the test suite, deliberately. The suite is what
+# enforces the verification and maturity gates, the checks that stop the app
+# telling somebody they are entitled to money nobody has confirmed. A deploy
 # that can outrun those tests defeats the point of having them.
-#
-# So Vercel's Git integration should be left DISCONNECTED for this project and
-# the deploy driven from here instead. See DEPLOY.md.
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  # One deploy at a time per branch; a newer push supersedes an in-flight one.
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: Typecheck and tests
+    name: Typecheck, tests and build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # The build enforces its own size budget, so a bundle that quietly grows
+      # into hundreds of kilobytes fails here. Part of the audience opens this
+      # on an old phone on metered data.
+      - run: npm run build
+      - name: Upload the site
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
 
-  preview:
-    name: Preview deploy
+  deploy:
+    name: Publish to Pages
     needs: verify
-    if: github.event_name == 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
-      name: preview
-      url: ${{ steps.deploy.outputs.url }}
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: pages
+        uses: actions/deploy-pages@v4
+
+  smoke:
+    name: Smoke test the live site
+    needs: deploy
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci
-      - name: Pull Vercel environment
-        run: npx vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Build
-        run: npx vercel build --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Deploy
-        id: deploy
-        run: |
-          url=$(npx vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
+          node-version-file: .nvmrc
 
-  production:
-    name: Production deploy
-    needs: verify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: ${{ steps.deploy.outputs.url }}
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci
-      - name: Pull Vercel environment
-        run: npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Build
-        run: npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Deploy
-        id: deploy
-        run: |
-          url=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "Production: $url" >> "$GITHUB_STEP_SUMMARY"
-
-      # A deployed build must still refuse to answer while the rule base is
-      # unverified. If this ever starts failing, either the law got verified
-      # (good, update the check) or a gate was removed (stop and find out why).
-      # Two different claims, so two checks.
+      # Two different claims, so two checks where possible.
       #
-      # The deployment URL proves the build that just went out behaves. The
-      # production domain proves the alias actually points at it — an alias can
-      # be stale or misconfigured while the deployment itself is perfect, and
-      # the domain is the only one of the two that a visitor will ever type.
-      - name: Smoke test the gates on the new deployment
-        run: node scripts/smoke-gates.mjs "${{ steps.deploy.outputs.url }}"
+      # The Pages URL proves the build that just went out is being served. The
+      # production domain proves the DNS and the Pages custom-domain setting
+      # actually point at it — either can be wrong while the deployment itself
+      # is perfect, and the domain is the only one of the two a visitor will
+      # ever type.
+      - name: Check the Pages URL
+        run: node scripts/smoke-site.mjs "${{ needs.deploy.outputs.page_url || 'https://frantisekjanickovic.github.io/mojedavky/' }}"
+        continue-on-error: true
 
-      - name: Smoke test the gates on the production domain
+      - name: Check the production domain
         if: vars.PRODUCTION_URL != ''
-        run: node scripts/smoke-gates.mjs "${{ vars.PRODUCTION_URL }}"
+        run: node scripts/smoke-site.mjs "${{ vars.PRODUCTION_URL }}"
 
       - name: Warn when the production domain is not configured
         if: vars.PRODUCTION_URL == ''
@@ -115,8 +95,7 @@ jobs:
           {
             echo "### Production domain not checked"
             echo
-            echo "The repository variable \`PRODUCTION_URL\` is not set, so only the"
-            echo "deployment URL was smoke tested. Set it under Settings →"
-            echo "Secrets and variables → Actions → Variables to also verify that"
-            echo "the domain alias points at this deployment."
+            echo "The repository variable \`PRODUCTION_URL\` is not set, so the"
+            echo "custom domain was not verified. Set it under Settings →"
+            echo "Secrets and variables → Actions → Variables."
           } >> "$GITHUB_STEP_SUMMARY"

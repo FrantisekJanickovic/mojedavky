@@ -1,143 +1,144 @@
 # Deployment
 
-GitHub is the source of truth, GitHub Actions runs the gate, Vercel serves the
-result. The `.sk` domain points at Vercel directly — there is no separate Slovak
-hosting step, because a `.sk` domain is a DNS record, not a hosting location.
+GitHub is the source of truth, GitHub Actions runs the gate, GitHub Pages serves
+the result on `mojedavky.sk`. No third-party host and no server.
 
-## Why Vercel's Git integration stays disconnected
+## Why no server at all
 
-Vercel's own integration deploys on push whether or not CI passed. For a
-marketing site that is a feature. Here it would let a deploy outrun the test
-suite, and the suite is what enforces the verification and maturity gates — the
-checks that stop the app telling somebody they are entitled to money nobody has
-confirmed.
+The app bundles the engine into the page and runs the whole screening in the
+browser. Nothing personal is ever sent anywhere, so a static host is not just
+sufficient — it is better. No server means no server that could log, cache or
+leak somebody's income and household composition.
 
-So: import the project into Vercel, then **turn the Git integration off** and
-let `.github/workflows/deploy.yml` drive it.
+It also makes the hosting-location question dissolve. There is no point arguing
+about which country the files sit in when the files are a questionnaire and the
+answers never leave the phone.
+
+Vercel was in the original plan and is not needed. It would add an account, a
+token to rotate, three repository secrets and a second place where deployments
+can happen — in exchange for serverless functions this product does not use.
 
 ## One-time setup
 
-### 1. Create the Vercel project
+### 1. Turn on Pages, built by Actions
 
-```bash
-npm i -g vercel
-vercel login
-vercel link          # from the repository root; creates .vercel/
+Repository → Settings → Pages → **Source: GitHub Actions**.
+
+Not "Deploy from a branch". The workflow publishes the built `dist/`, so there
+is no `gh-pages` branch and no build output in git.
+
+### 2. Set the custom domain
+
+Settings → Pages → Custom domain → `mojedavky.sk` → Save.
+
+Then tick **Enforce HTTPS**. The checkbox can take up to 24 hours to become
+available after DNS resolves, and until then the site is reachable over plain
+HTTP — so check back for it rather than assuming.
+
+Note: with an Actions-published site, GitHub does **not** create a `CNAME` file
+and ignores one if it exists. The domain lives in the Pages setting only. There
+is deliberately no `CNAME` file in this repository.
+
+### 3. DNS at the registrar
+
+For the apex domain, four `A` records:
+
+```
+@   A   185.199.108.153
+@   A   185.199.109.153
+@   A   185.199.110.153
+@   A   185.199.111.153
 ```
 
-`vercel link` writes `.vercel/project.json` with the two IDs you need next.
-That directory is gitignored on purpose — the IDs belong in secrets, not in the
-repository.
+Optionally the IPv6 equivalents as well, which GitHub recommends alongside the
+`A` records rather than instead of them:
 
-### 2. Disconnect the Git integration
+```
+@   AAAA   2606:50c0:8000::153
+@   AAAA   2606:50c0:8001::153
+@   AAAA   2606:50c0:8002::153
+@   AAAA   2606:50c0:8003::153
+```
 
-Vercel dashboard → the project → Settings → Git → **Disconnect**.
+And `www` as a `CNAME` to the account, **without** the repository name:
 
-### 3. Add the repository secrets
+```
+www   CNAME   frantisekjanickovic.github.io
+```
 
-GitHub → the repository → Settings → Secrets and variables → Actions:
+Do not point `www` at the `*.pages.github.io` address shown in the Pages
+settings panel.
 
-| Secret | Where it comes from |
-|---|---|
-| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
-| `VERCEL_ORG_ID` | `.vercel/project.json` → `orgId` |
-| `VERCEL_PROJECT_ID` | `.vercel/project.json` → `projectId` |
+### 4. One repository variable
 
-And one **variable** (Variables tab, not Secrets — it is not a secret and it is
-useful to see it in logs):
+Settings → Secrets and variables → Actions → **Variables**:
 
 | Variable | Value |
 |---|---|
-| `PRODUCTION_URL` | `https://your-domain.sk` |
+| `PRODUCTION_URL` | `https://mojedavky.sk` |
 
-The domain lives here rather than in the workflow so that changing it, or
-pointing the pipeline at a staging host, needs no commit. If it is unset the
-pipeline still deploys and still smoke-tests the deployment URL — it just says
-in the run summary that it could not check the domain alias.
+A variable rather than a secret, because it is not one and it is useful to see
+it in the logs. It lives here rather than in the workflow so changing the domain
+needs no commit. If unset the pipeline still deploys; it just says in the run
+summary that it could not verify the domain.
 
-### 4. Protect `main`
+No secrets are needed at all. Pages deploys with the workflow's own
+`GITHUB_TOKEN`, so there is no token to create, store or rotate.
 
-GitHub → Settings → Branches → add a rule for `main`:
+### 5. Protect `main`
+
+Settings → Branches → add a rule for `main`:
 
 - require a pull request before merging
-- require the **Typecheck and tests** check to pass
+- require the **Typecheck, tests and build** check to pass
 
 Without this the gate is advisory: anybody can push straight to `main` and the
-production job runs on whatever landed.
-
-### 5. Point the domain at Vercel
-
-```bash
-vercel domains add example.sk
-vercel domains inspect example.sk     # authoritative records for THIS project
-```
-
-Use what `inspect` prints rather than anything written down here — Vercel can
-hand out different targets per project. At the time of writing the apex record
-is an `A` to `76.76.21.21` and a subdomain is a `CNAME` to
-`cname.vercel-dns-0.com`.
-
-At the registrar (for a `.sk` domain, usually through your registrar's panel
-rather than sk-nic directly):
-
-```
-@      A      76.76.21.21
-www    CNAME  cname.vercel-dns-0.com
-```
-
-A `.sk` domain served from Vercel is just these two records. There is no
-separate Slovak hosting step, and none is needed unless a municipality imposes
-a data-location requirement in a contract — at which point it becomes a
-reverse proxy in front of the same build, not a migration.
-
-Then:
-
-```bash
-vercel certs ls          # confirm the certificate was issued
-```
-
-TLS is automatic once DNS resolves. Set the apex-vs-www redirect in the project
-settings so only one of them is canonical.
+deploy runs on whatever landed.
 
 ## What happens on each event
 
 | Event | Result |
 |---|---|
-| Pull request | typecheck + tests, then a preview deploy with its own URL |
-| Push to `main` | typecheck + tests, production deploy, then two gate smoke tests |
-| Tests fail | nothing deploys, on either path |
+| Pull request | typecheck, tests, build with its size budget — no deploy |
+| Push to `main` | the same, then publish to Pages, then smoke-test the live site |
+| Tests or budget fail | nothing deploys |
 
-The production job smoke-tests **twice**, because they are different claims:
+The build enforces a bundle size budget and fails over it. That is not fussiness:
+part of the audience opens this on an old phone on metered data, and a bundle
+that drifts into hundreds of kilobytes is a real barrier to them.
 
-- against the **deployment URL**, which proves the build that just went out
-  behaves
-- against the **production domain**, which proves the alias actually points at
-  it — an alias can be stale or misconfigured while the deployment itself is
-  perfect, and the domain is the only one of the two a visitor will ever type
+### The smoke test
 
-The production job finishes by running `scripts/smoke-gates.mjs` against the URL
-it just deployed. The unit tests prove the gates hold in the repository; this
-proves they hold in what actually shipped, which is a different claim — a build
-step or a stray environment variable could undo them in between.
+After publishing, `scripts/smoke-site.mjs` fetches the live site and checks that
+the right files are actually being served at the right address. The unit tests
+prove the app behaves in a test DOM; this proves the deployment is real — a
+build can be perfect while DNS points at a parking page, the custom domain was
+never saved, or an old deployment is still live.
 
-That smoke test asserts the current intended state: **nothing is verified, so
-nothing is entitled.** When real benefits get verified and reviewed, the check
-has to be updated alongside them. If it ever fails and you did not just verify
-something, a gate has gone missing — roll back rather than deploying over it.
+It also checks two things that would be quiet failures: that the bundle contains
+the rules at all, and that it carries no development-mode marker, since
+development mode is what switches the verification and maturity gates off.
+
+Run it against anything, including a local build:
+
+```bash
+npm run build
+cd dist && python3 -m http.server 8000 &
+node scripts/smoke-site.mjs http://localhost:8000
+```
 
 ## Rolling back
 
-```bash
-vercel ls                        # find the previous good deployment
-vercel promote <deployment-url>  # make it production again
-```
+Re-run an older successful **Deploy** workflow from the Actions tab, or revert
+the commit and push. Pages serves whatever the last successful run published.
 
-Instant, because Vercel keeps every build. Faster than reverting a commit and
-waiting for CI, so reach for this first and fix the repository afterwards.
+Reverting is the honest option here. Unlike a platform with stored immutable
+builds, Pages has no one-command promote, so keep `main` deployable rather than
+relying on a rollback button.
 
 ## Later: Czechia
 
-A second Vercel project from the same repository, with its own domain, built
-against `src/rules/cz/`. Two projects rather than one with a flag, for the same
-reason the rule packages are separate: a Czech mistake must not be able to break
-Slovakia.
+A second repository, or a second workflow in this one publishing a different
+build from `src/rules/cz/` to a second Pages site and domain. Separate, for the
+same reason the rule packages are separate: a Czech mistake must not be able to
+break Slovakia.

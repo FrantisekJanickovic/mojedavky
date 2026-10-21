@@ -1,9 +1,10 @@
 /**
- * Contract tests for the deployed endpoint.
+ * Contract tests for the HTTP handler.
  *
- * These call the handler directly rather than over HTTP, so they test what the
- * function does, not whether Vercel bundled it. The bundling is what the
- * post-deploy smoke test covers — two different claims, both worth making.
+ * The handler is not deployed — the site is static and the browser runs the
+ * engine itself. These tests exist because the handler is the seed of the batch
+ * screening that would run server-side, and the contract is worth pinning
+ * before anything depends on it.
  *
  * The one that matters most is the last group: the endpoint runs in production
  * mode, so it must refuse to state an entitlement while the rule base is
@@ -12,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import handler from '../api/screen.js';
+import handler from '../src/server/screen.js';
 
 const endpoint = 'https://example.test/api/screen';
 
@@ -98,7 +99,7 @@ describe('a valid request', () => {
   });
 });
 
-describe('the endpoint runs in production mode', () => {
+describe('the handler runs in production mode', () => {
   it('states no entitlement while the rule base is unverified', async () => {
     const response = await handler(post(household));
     const report = (await response.json()) as {

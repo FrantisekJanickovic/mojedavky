@@ -1,19 +1,23 @@
 /**
- * Vercel function: POST a household, get a screening back.
+ * HTTP handler: POST a household, get a screening back.
  *
- * It exists for the batch and server-rendered cases. The browser build calls
- * `screenSk` directly instead, so an ordinary visitor's income and health
- * facts never leave their device at all.
+ * NOT DEPLOYED. The site is static and the browser runs the engine itself, so
+ * nothing here is reachable in production today — and that is the point: an
+ * ordinary visitor's income and health facts never leave their device, because
+ * there is no endpoint for them to be sent to.
  *
- * Nothing here persists anything. There is no database, no session and no
- * request-body logging, which is also why the free calculator needs no
- * privacy policy longer than a paragraph.
+ * It is kept because the batch screening that municipalities would pay for does
+ * need a server, and this is its seed: a framework-agnostic handler over the
+ * standard Request/Response pair, so it will drop into whatever runtime that
+ * product ends up on. Its tests also pin a contract worth keeping — that the
+ * server path runs in production mode and therefore refuses to state an
+ * entitlement from unverified rules.
+ *
+ * It persists nothing: no database, no session, no request-body logging.
  */
 
-import { screenSk } from '../src/index.js';
-import type { Situation } from '../src/engine/types.js';
-
-export const config = { runtime: 'nodejs' };
+import { screenSk } from '../index.js';
+import type { Situation } from '../engine/types.js';
 
 function badRequest(message: string): Response {
   return new Response(JSON.stringify({ error: message }), {

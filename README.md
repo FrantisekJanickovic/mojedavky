@@ -16,13 +16,16 @@ What is done:
 - two Slovak benefits as drafts, with real legal references
 - "where and how to claim" with documents to bring, per benefit
 - "below the line" prompts for entitlements the engine cannot decide
-- 47 tests, type-checked, CI on every push
+- the question graph: asks what eliminates, skips what cannot matter
+- the browser app, 24 kB, no framework, nothing stored
+- 118 tests, type-checked, built and smoke-tested on every push
 
 What is not:
 
 - every parameter is `verified: false` and several are literal placeholders
 - both benefits are `maturity: 'draft'`
-- no user interface
+- no filled-in PDF to take to the office yet
+- no batch screening for municipalities yet
 
 ## Why there is no OpenFisca here
 
@@ -105,7 +108,7 @@ be reproducible in front of a caseworker.
 ```
 src/
 ├── engine/           jurisdiction-agnostic
-│   ├── types.ts      situation, outcome, lead, the two gates' statuses
+│   ├── types.ts      situation, outcome, lead, the gates' statuses
 │   ├── parameters.ts dated parameter resolution
 │   └── simulate.ts   evaluation, trace, lead suppression
 ├── rules/sk/         the Slovak package
@@ -113,9 +116,13 @@ src/
 │   ├── benefits/     one file per benefit
 │   ├── leads.ts      below-the-line prompts
 │   └── offices.ts    where to claim, what to bring
+├── intake/           the question graph
+├── web/main.ts       the browser app
+├── server/screen.ts  HTTP handler — NOT deployed, seed of the batch product
 └── index.ts          screenSk()
-api/screen.ts         Vercel function
-tests/                47 tests
+web/index.html        page shell, styles inline
+scripts/              build and post-deploy checks
+tests/                118 tests
 ```
 
 Czechia goes in `src/rules/cz/`, not behind a flag in `sk/`. Entities,
@@ -127,14 +134,24 @@ Separate packages also mean a Czech mistake cannot break Slovakia.
 
 ```bash
 npm install
-npm test          # 47 tests
+npm test          # 118 tests
 npm run typecheck
-npm run verify    # both
+npm run build     # static site into dist/, with a size budget
+npm run verify    # all three
+npm run dev       # build and serve dist/ locally
 ```
 
-Deploying to Vercel needs no configuration beyond this repository. The eventual
-move to Slovak hosting is a static frontend plus one Node function, so it is a
-reverse proxy and a DNS record — not a migration.
+## Deployment
+
+GitHub Pages on `mojedavky.sk`, published by Actions and gated on the test
+suite. No third-party host, no server, no secrets to rotate — Pages deploys with
+the workflow's own token. See DEPLOY.md.
+
+There is no server because there is nothing for one to do. The engine is bundled
+into the page and the screening runs in the browser, so no personal data is ever
+transmitted. That also settles the hosting-location question: there is no point
+arguing about which country the files sit in when the files are a questionnaire
+and the answers never leave the phone.
 
 ## Offices
 
