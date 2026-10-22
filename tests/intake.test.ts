@@ -175,10 +175,15 @@ describe('answers map onto a situation', () => {
   });
 
   it('does not guess a child age it never asked for', () => {
-    // Age is left at zero rather than invented. The benefits that need a real
-    // age must record a missing fact instead of being handed a guess.
+    // This used to assert the age was left at zero, which was itself the bug:
+    // zero is an invented age, it is under every ceiling, and the child
+    // allowance's age test passed for everybody because of it. Absent is the
+    // only honest value for a fact nobody supplied, and the rule records it as
+    // a missing fact.
     const s = toSituation(answers, '2026-08');
-    expect(s.persons.filter((p) => p.role === 'child').every((c) => c.ageYears === 0)).toBe(true);
+    const children = s.persons.filter((p) => p.role === 'child');
+    expect(children.length).toBeGreaterThan(0);
+    expect(children.every((c) => c.ageYears === undefined)).toBe(true);
   });
 });
 

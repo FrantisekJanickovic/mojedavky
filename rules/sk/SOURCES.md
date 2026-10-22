@@ -78,6 +78,50 @@ Two groups differ from the rest and are worth separating early:
   assessment does. These can only ever be leads in this product, never
   computed outcomes.
 
+## The forms
+
+ÚPSVR publishes the forms as PDFs. These are the starting point for each
+benefit, per the order above.
+
+| Form | URL |
+|---|---|
+| Žiadosť o prídavok na dieťa | `upsvr.gov.sk/buxus/docs/SSVaR/statne_soc.davky/Ziadost_o_pridavok_na_dieta_092025.pdf` |
+| Žiadosť o príplatok k prídavku na dieťa | `upsvr.gov.sk/buxus/docs/SSVaR/tlaciva/Ziadost_o_priplatok_k_PnD.pdf` |
+| Žiadosť o prídavok na ďalšie dieťa | `upsvr.gov.sk/buxus/docs/SSVaR/tlaciva/Ziadost_o_PnD_dalsie_dieta.pdf` |
+| Žiadosť o rodičovský príspevok | `upsvr.gov.sk/buxus/docs/SSVaR/statne_soc.davky/Ziadost_o_rodicovsky_prispevok.pdf` |
+| Poučenie pre občana žiadajúceho o ŠSD | `upsvr.gov.sk/buxus/docs/SSVaR/tlaciva/Poucenie_pre_obcana_ziadajuceho_o_SSD.pdf` |
+
+The file name of the first carries its own revision date (`092025`), so a
+newer one will appear under a different name rather than replacing it. Check
+the ÚPSVR forms index rather than assuming this link stays current.
+
+The **poučenie** is the most underrated document of the set. It is where the
+reporting obligations are written out — what the claimant must tell the office
+within eight days, from a change of school to a child turning three — and those
+map directly onto what a result page should tell somebody *after* they claim.
+It also describes the *osobitný príjemca*, where the benefit is paid to the
+municipality instead of the parent, which no act summary mentions.
+
+### What the child allowance form settled
+
+Reading it changed three things in the model:
+
+- **There is no income question on it.** Prídavok na dieťa is not means-tested,
+  so asking household income before it is simply asking for something that
+  benefit cannot use. The ordering of the intake has to follow from which
+  benefit needs what, not from a general sense of what a benefits app asks.
+- **Dependency is evidenced by the school**, not asserted. The form asks which
+  school the child attends and the office draws the conclusion. We ask for the
+  conclusion, because a screening cannot verify an enrolment — one more reason
+  this benefit stays `draft`.
+- **Residence and cross-border status is a first-class fact**, and we model
+  none of it. The form has three address blocks — permanent in SK, temporary in
+  SK, and residence in another EU state — plus a "social status and country"
+  section for both the applicant and the second eligible person. That is EU
+  Regulation 883/2004 coordination. For a household living and working only in
+  Slovakia it collapses to nothing, which is why it can wait; but it is the
+  likeliest reason for the office to decide differently from this app.
+
 ## Citing a dated version
 
 Slov-lex serves the consolidated text as it stood on a given day, and puts the

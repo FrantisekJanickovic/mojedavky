@@ -23,6 +23,7 @@ export const skLeads: LeadRule[] = [
     because: 'V domácnosti je dieťa s potvrdeným dlhodobo nepriaznivým zdravotným stavom.',
     office: 'upsvar',
     moreInfoUrl: 'https://www.upsvr.gov.sk/socialne-veci-a-rodina/statne-socialne-davky/',
+    reads: ['persons.role', 'persons.hasCertifiedLongTermIllness'],
     when: (s) => children(s).some((c) => c.hasCertifiedLongTermIllness === true),
   },
   {
@@ -32,6 +33,7 @@ export const skLeads: LeadRule[] = [
     because: 'Niekto v domácnosti má preukaz ŤZP.',
     office: 'upsvar',
     moreInfoUrl: 'https://www.upsvr.gov.sk/socialne-veci-a-rodina/',
+    reads: ['persons.hasDisabilityCard'],
     when: (s) => s.persons.some((p) => p.hasDisabilityCard === true),
   },
   {
@@ -41,6 +43,7 @@ export const skLeads: LeadRule[] = [
     because: 'V domácnosti je dieťa a aspoň jedna osoba s príjmom.',
     office: 'financna-sprava',
     moreInfoUrl: 'https://www.financnasprava.sk/',
+    reads: ['persons.role', 'persons.incomeMonthly'],
     when: (s) => children(s).length > 0 && s.persons.some((p) => (p.incomeMonthly ?? 0) > 0),
   },
   {
@@ -55,6 +58,7 @@ export const skLeads: LeadRule[] = [
     // entitlement: nobody needs to be told to go and check a thing they have
     // just been told they qualify for.
     supersededBy: ['sk-prispevok-na-byvanie'],
+    reads: ['household.housingCostMonthly', 'persons.incomeMonthly'],
     when: (s) => {
       const cost = s.household.housingCostMonthly;
       if (cost === undefined || cost <= 0) return false;
@@ -70,6 +74,14 @@ export const skLeads: LeadRule[] = [
     because: 'Dospelá osoba bez príjmu, ktorá nie je evidovaná ako uchádzač o zamestnanie.',
     office: 'upsvar',
     moreInfoUrl: 'https://www.upsvr.gov.sk/sluzby-zamestnanosti/',
+    reads: [
+      'persons.role',
+      'persons.incomeMonthly',
+      'persons.isRegisteredJobseeker',
+      'persons.isPensioner',
+      'persons.isStudent',
+      'persons.isOnParentalLeave',
+    ],
     when: (s) =>
       s.persons.some(
         (p) =>

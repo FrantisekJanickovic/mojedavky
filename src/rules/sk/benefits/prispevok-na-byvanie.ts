@@ -28,6 +28,7 @@ export const prispevokNaByvanie: Benefit = {
   office: 'upsvar',
   maturity: 'draft',
   requiredFacts: [
+    'persons.role',
     'household.tenure',
     'household.housingCostMonthly',
     'persons.incomeMonthly',

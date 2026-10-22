@@ -21,7 +21,7 @@ export const pridavokNaDieta: Benefit = {
   law: 'zákon č. 600/2003 Z. z.',
   office: 'upsvar',
   maturity: 'draft',
-  requiredFacts: ['persons.ageYears', 'persons.isDependentChild'],
+  requiredFacts: ['persons.role', 'persons.ageYears', 'persons.isDependentChild'],
 
   evaluate(ctx: EvaluationContext) {
     const children = ctx.children();
@@ -40,11 +40,15 @@ export const pridavokNaDieta: Benefit = {
     const perChild = ctx.param('pridavok.zakladna-suma');
 
     const qualifying = children.filter((child) => {
-      // An unanswered dependency question is not a "no". Treating silence as
-      // a refusal is how a screening tool quietly tells people they get
-      // nothing, so it is recorded as a missing fact instead.
+      // An unanswered question is not a "no". Treating silence as a refusal is
+      // how a screening tool quietly tells people they get nothing, so both
+      // unknowns below are recorded as missing facts instead.
       if (child.isDependentChild === undefined) {
         ctx.missing(`persons.${child.id}.isDependentChild`);
+        return false;
+      }
+      if (child.ageYears === undefined) {
+        ctx.missing(`persons.${child.id}.ageYears`);
         return false;
       }
       return child.isDependentChild && child.ageYears < maxAge;

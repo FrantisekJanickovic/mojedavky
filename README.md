@@ -18,7 +18,7 @@ What is done:
 - "below the line" prompts for entitlements the engine cannot decide
 - the question graph: asks what eliminates, skips what cannot matter
 - the browser app, 24 kB, no framework, nothing stored
-- 139 tests, type-checked, built and smoke-tested on every push
+- 156 tests, type-checked, built and smoke-tested on every push
 
 What is not:
 
@@ -134,13 +134,15 @@ src/
 │   ├── benefits/     one file per benefit
 │   ├── leads.ts      below-the-line prompts
 │   └── offices.ts    where to claim, what to bring
-├── intake/           the question graph
+├── intake/
+│   ├── facts.ts      the fact register — every fact the system can know
+│   └── questions.ts  the question graph
 ├── web/main.ts       the browser app
 ├── server/screen.ts  HTTP handler — NOT deployed, seed of the batch product
 └── index.ts          screenSk()
 web/index.html        page shell, styles inline
 scripts/              rule compiler, build, post-deploy checks
-tests/                139 tests
+tests/                156 tests
 ```
 
 Numbers in YAML, logic in TypeScript. The amounts change yearly by decree and
@@ -159,7 +161,7 @@ Separate packages also mean a Czech mistake cannot break Slovakia.
 ```bash
 npm install
 npm run rules     # validate the YAML and compile the rule pack
-npm test          # 139 tests
+npm test          # 156 tests
 npm run typecheck
 npm run build     # static site into dist/, with a size budget
 npm run verify    # all of the above, in order

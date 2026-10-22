@@ -27,6 +27,12 @@ export interface LeadRule {
   because: string;
   office: Lead['office'];
   moreInfoUrl?: string;
+  /**
+   * Registered facts `when` consults. Declared rather than inferred, because a
+   * lead that quietly depends on a fact nobody asks for would simply never
+   * fire — the least visible way for this product to fail.
+   */
+  reads: string[];
   /** True when this is worth raising for this household. */
   when(situation: Situation): boolean;
   /**

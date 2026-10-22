@@ -218,6 +218,7 @@ describe('leads', () => {
     prompt: 'check this',
     because: 'reason',
     office: 'upsvar',
+    reads: [],
     when: () => true,
   };
 

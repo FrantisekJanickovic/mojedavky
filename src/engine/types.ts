@@ -40,8 +40,17 @@ export type PersonRole = 'applicant' | 'partner' | 'child' | 'other';
 export interface Person {
   id: string;
   role: PersonRole;
-  /** Age in whole years at the start of the assessed period. */
-  ageYears: number;
+  /**
+   * Age in whole years at the start of the assessed period.
+   *
+   * Optional, and absent rather than defaulted when unknown. It used to be
+   * required, which meant the intake had to put *something* there — it put
+   * zero for every child, and the age ceiling in the child allowance silently
+   * stopped binding on anybody. A rule that needs an age now has to say so and
+   * record a missing fact, which is the same treatment every other unknown
+   * gets.
+   */
+  ageYears?: number;
   /** Gross monthly income in EUR from all sources. */
   incomeMonthly: number;
   /** Still in qualifying education / not yet self-supporting. */
