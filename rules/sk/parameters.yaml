@@ -20,6 +20,9 @@
 # Which document to trust: the act fixes the entitlement, the amounts are set
 # by decree (opatrenie / nariadenie vlády) and re-set most years, usually from
 # 1 January or 1 July. The act alone will not give you the current figure.
+#
+# SOURCES.md, next to this file, says where each document lives and what order
+# to open them in. Read it before starting on a benefit that is not here yet.
 
 jurisdiction: sk
 

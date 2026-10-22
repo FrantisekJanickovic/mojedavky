@@ -60,7 +60,11 @@ step — never `not-eligible`. Not knowing is not the same as refusing.
 
 ## Verifying a parameter
 
-One at a time, with a test for each:
+`rules/sk/SOURCES.md` is the sourcing map: which act, decree and authority page
+each benefit needs, and why the application form is the right thing to open
+first. Start there for anything not yet modelled.
+
+One parameter at a time, with a test for each:
 
 1. Open the parameter's `source` in `rules/sk/parameters.yaml`. The numbers live
    in YAML, not TypeScript, so checking a figure against a decree does not mean
