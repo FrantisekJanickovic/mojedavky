@@ -117,8 +117,8 @@ describe('the result page is honest about what it does not know', () => {
   it('says plainly that some benefits cannot be calculated yet', () => {
     completeFlow();
     expect(text()).toContain('Čo sme zistili');
-    expect(text()).toMatch(/ešte nedokážeme spočítať/i);
-    expect(text()).toMatch(/radšej nepovieme nič/i);
+    expect(text()).toMatch(/zatiaľ nespočítame/i);
+    expect(text()).toMatch(/radšej vám nepovieme nič/i);
   });
 
   it('claims no entitlement and shows no euro amount while the rules are gated', () => {
@@ -136,7 +136,11 @@ describe('the result page is honest about what it does not know', () => {
   it('shows the leads, which need no verified amounts', () => {
     completeFlow();
     expect(text()).toContain('Stojí za to overiť');
-    expect(app().querySelectorAll('.card.lead').length).toBeGreaterThan(0);
+    // Asserted on the content rather than on a class name: the layout carries
+    // no boxes to count, and a lead is only worth anything if its reason is
+    // on screen next to it.
+    expect(text()).toMatch(/daňový bonus|preukaz ŤZP|evidencia/i);
+    expect(app().querySelectorAll('.entry').length).toBeGreaterThan(0);
   });
 
   it('states it is not a decision and not legal advice', () => {
@@ -162,6 +166,59 @@ describe('the result page is honest about what it does not know', () => {
     expect(app().querySelector<HTMLInputElement>('input[type="number"]')!.value).toBe('');
     const bar = app().querySelector('[role="progressbar"]')!;
     expect(bar.getAttribute('aria-valuenow')).toBe('0');
+  });
+});
+
+describe('going back', () => {
+  it('returns to the previous question and forgets its answer', () => {
+    clickText('Začať');
+    expect(currentLegend()).toMatch(/Koľko detí/);
+    answerNumber(0);
+
+    const second = currentLegend();
+    expect(second).not.toBe('');
+
+    clickText('Späť');
+    expect(currentLegend()).toMatch(/Koľko detí/);
+    // Forgotten, not merely hidden: the field is empty again.
+    expect(app().querySelector<HTMLInputElement>('input[type="number"]')!.value).toBe('');
+  });
+
+  it('leaves the survey when there is nothing left to go back to', () => {
+    clickText('Začať');
+    clickText('Späť');
+    expect(app().querySelector('legend')).toBeNull();
+    expect(text()).toContain('Ako to funguje');
+  });
+});
+
+describe('the progress bar adapts instead of counting steps', () => {
+  function percentNow(): number {
+    const bar = app().querySelector('[role="progressbar"]')!;
+    return Number(bar.getAttribute('aria-valuenow'));
+  }
+
+  it('shows no step count, which would be a promise about a moving total', () => {
+    clickText('Začať');
+    expect(text()).not.toMatch(/krok \d+ z \d+/i);
+    expect(text()).not.toMatch(/otázka \d+ z \d+/i);
+  });
+
+  it('retreats when an answer opens more questions', async () => {
+    // One answer in, having said there are no children, the end is closer than
+    // it is for somebody who has just said there are two — because saying two
+    // created questions that did not exist a moment ago. The bar follows the
+    // real denominator rather than pretending the path never changed.
+    clickText('Začať');
+    answerNumber(0);
+    const withoutChildren = percentNow();
+
+    await mount();
+    clickText('Začať');
+    answerNumber(2);
+    const withChildren = percentNow();
+
+    expect(withChildren).toBeLessThan(withoutChildren);
   });
 });
 

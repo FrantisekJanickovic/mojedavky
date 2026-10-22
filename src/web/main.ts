@@ -4,11 +4,12 @@
  * It runs the whole screening locally. No request is made, no analytics is
  * loaded, and nothing is stored — not in localStorage either, because a shared
  * or borrowed phone is a realistic situation for this audience and a restored
- * answer about somebody's income is a leak.
+ * answer about somebody's income is a leak. Keeping answers is therefore an
+ * explicit act: the person saves a file, and knows they have one.
  *
- * Deliberately no framework. This is a ten-question flow and a result page;
- * vanilla DOM keeps the bundle in single-digit kilobytes, which matters more
- * here than developer convenience. Part of the audience opens this on a
+ * Deliberately no framework. This is a short flow and a result page; vanilla
+ * DOM keeps the bundle in tens of kilobytes rather than hundreds, which matters
+ * more here than developer convenience. Part of the audience opens this on a
  * five-year-old phone on metered data.
  */
 
@@ -16,21 +17,36 @@ import {
   canScreen,
   nextQuestion,
   progress,
+  pruneIrrelevant,
   toSituation,
+  validateAnswer,
   type Answers,
   type Question,
 } from '../intake/questions.js';
 import { screenSk, type Report } from '../index.js';
 import { skOffices } from '../rules/sk/offices.js';
+import { skRulePackVersion } from '../rules/sk/parameters.js';
+import { AnswersFileError, download, fromXml, toXml } from './answers-file.js';
 import type { Outcome } from '../engine/types.js';
 
-const answers: Answers = {};
+type Screen = 'intro' | 'survey' | 'result';
+
+let answers: Answers = {};
+/** Answer order, so "Späť" undoes the last thing the person actually did. */
+let order: string[] = [];
+let screen: Screen = 'intro';
+let notice = '';
+
 const root = document.getElementById('app');
 
 /** Assessment period: the current month. */
 function currentPeriod(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function money(value: number): string {
+  return `${value.toFixed(2).replace('.', ',')} €`;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -49,8 +65,18 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function clear(): void {
-  if (root) root.textContent = '';
+function link(href: string, text: string): HTMLAnchorElement {
+  return el('a', { href, rel: 'noopener' }, [text]);
+}
+
+function button(
+  label: string,
+  onClick: () => void,
+  kind: 'primary' | 'quiet' = 'primary',
+): HTMLButtonElement {
+  const node = el('button', { class: kind, type: 'button' }, [label]);
+  node.addEventListener('click', onClick);
+  return node;
 }
 
 /** Move focus to the new heading so a screen reader announces each step. */
@@ -62,6 +88,16 @@ function focusHeading(): void {
   }
 }
 
+// --- progress --------------------------------------------------------------
+
+/**
+ * A bar with no step count beside it.
+ *
+ * The count would be a promise about a total that genuinely changes: saying
+ * there are children opens questions that did not exist a moment ago. The bar
+ * simply follows the real denominator, so it can move backwards — which is
+ * honest, and reads as the path getting longer rather than as lost work.
+ */
 function renderProgress(): HTMLElement {
   const { answered, total } = progress(answers);
   const pct = total === 0 ? 0 : Math.round((answered / total) * 100);
@@ -69,22 +105,160 @@ function renderProgress(): HTMLElement {
   const fill = el('i');
   fill.style.width = `${pct}%`;
 
-  const bar = el(
+  return el(
     'div',
     {
-      class: 'bar',
+      class: 'progress',
       role: 'progressbar',
-      ariaValueNow: String(answered),
-      ariaValueMax: String(total),
-      ariaLabel: `Otázka ${answered + 1} z ${total}`,
+      ariaValueMin: '0',
+      ariaValueMax: '100',
+      ariaValueNow: String(pct),
+      ariaLabel: 'Priebeh vypĺňania',
     },
     [fill],
   );
-  return bar;
+}
+
+// --- saving and loading ----------------------------------------------------
+
+function saveAnswers(): void {
+  const stamp = new Date().toISOString().slice(0, 10);
+  download(`moje-odpovede-${stamp}.xml`, toXml(answers, skRulePackVersion), 'application/xml');
+}
+
+function loadAnswers(): void {
+  const picker = el('input', { type: 'file', accept: '.xml,application/xml,text/xml' });
+  picker.style.display = 'none';
+
+  picker.addEventListener('change', () => {
+    const file = picker.files?.[0];
+    picker.remove();
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      try {
+        const result = fromXml(String(reader.result ?? ''));
+        answers = result.answers;
+        order = Object.keys(result.answers);
+        screen = canScreen(answers) && !nextQuestion(answers) ? 'result' : 'survey';
+        notice =
+          result.rejected > 0
+            ? `Načítali sme ${result.loaded} odpovedí. ${result.rejected} sme nepoužili — nesedeli s otázkami.`
+            : `Načítali sme ${result.loaded} odpovedí.`;
+      } catch (error) {
+        notice =
+          error instanceof AnswersFileError
+            ? error.message
+            : 'Súbor sa nepodarilo prečítať.';
+      }
+      render();
+    });
+    reader.addEventListener('error', () => {
+      notice = 'Súbor sa nepodarilo prečítať.';
+      render();
+    });
+    reader.readAsText(file);
+  });
+
+  document.body.append(picker);
+  picker.click();
+}
+
+function fileActions(): HTMLElement {
+  return el('div', { class: 'actions no-print' }, [
+    button('Nahrať moje odpovede', loadAnswers, 'quiet'),
+    ...(Object.keys(answers).length > 0 ? [button('Uložiť odpovede', saveAnswers, 'quiet')] : []),
+  ]);
+}
+
+function noticeLine(): Node[] {
+  if (!notice) return [];
+  const text = notice;
+  notice = '';
+  return [el('p', { class: 'muted no-print', role: 'status' }, [text])];
+}
+
+// --- screens ---------------------------------------------------------------
+
+function renderIntro(): void {
+  if (!root) return;
+  root.textContent = '';
+
+  root.append(
+    el('h1', {}, ['Na čo máte nárok']),
+    el('p', { class: 'lede' }, [
+      'Štát vypláca dávky, o ktoré treba požiadať. Sami od seba neprídu, ' +
+        'a nikto vás na ne neupozorní.',
+    ]),
+    button('Začať', () => {
+      screen = 'survey';
+      render();
+    }),
+    // The privacy promise sits here, directly under the button, because this
+    // is where somebody hesitates. Further down the page it is an explanation;
+    // here it is a reason to press.
+    el('p', { class: 'faint' }, [
+      'Zvyčajne šesť až desať otázok, pár minút. ' +
+        'Odpovede zostávajú vo vašom zariadení.',
+    ]),
+    ...noticeLine(),
+
+    el('h2', {}, ['Ako to funguje']),
+    el('p', {}, [
+      'Pýtame sa len to, čo pri vašej situácii naozaj rozhoduje. ' +
+        'Kto nemá deti, nedostane ani jednu otázku o deťoch. ' +
+        'Pri každej odpovedi sa zvyšok otázok prispôsobí.',
+    ]),
+    el('p', {}, [
+      'Výpočet beží priamo vo vašom prehliadači. Nepotrebujeme meno ani ' +
+        'e-mail, odpovede sa nikam neposielajú a nikde sa neukladajú.',
+    ]),
+
+    el('h2', {}, ['Čo dostanete na konci']),
+    el('dl', {}, [
+      el('dt', {}, ['Na ktoré dávky máte nárok']),
+      el('dd', {}, ['Aj s orientačnou sumou na mesiac.']),
+      el('dt', {}, ['Kde a ako o ne požiadať']),
+      el('dd', {}, ['Ktorý úrad, akou cestou a aké doklady si vziať so sebou.']),
+      el('dt', {}, ['Čo ešte stojí za to overiť']),
+      el('dd', {}, ['Nároky, ktoré z vašich odpovedí nevieme rozhodnúť, ale môžu sa vás týkať.']),
+      el('dt', {}, ['Výsledok na vytlačenie a odpovede na uloženie']),
+      el('dd', {}, ['PDF pre seba alebo na úrad, a súbor XML, ktorý viete neskôr načítať späť.']),
+    ]),
+
+    fileActions(),
+
+    el('footer', {}, [
+      el('p', {}, [
+        'Toto nie je rozhodnutie úradu ani právne poradenstvo. ' +
+          'O nároku rozhoduje príslušný úrad na základe vašej žiadosti a dokladov.',
+      ]),
+    ]),
+  );
+
+  focusHeading();
+}
+
+function goBack(): void {
+  const last = order.pop();
+  if (last === undefined) {
+    screen = 'intro';
+    render();
+    return;
+  }
+  delete answers[last];
+  answers = pruneIrrelevant(answers);
+  order = order.filter((id) => id in answers);
+  render();
 }
 
 function answerAndAdvance(question: Question, value: Answers[string]): void {
   answers[question.id] = value;
+  order = order.filter((id) => id !== question.id).concat(question.id);
+  // A changed earlier answer can make a later one impossible.
+  answers = pruneIrrelevant(answers);
+  order = order.filter((id) => id in answers);
   render();
 }
 
@@ -92,169 +266,159 @@ function renderChoice(question: Question): HTMLElement {
   const group = el('div', { class: 'choices' });
 
   for (const choice of question.choices ?? []) {
-    const label = el('b', {}, [choice.label]);
-    const children: Node[] = [label];
+    const children: Node[] = [el('b', {}, [choice.label])];
     if (choice.hint) children.push(el('span', {}, [choice.hint]));
 
-    const button = el('button', { class: 'choice', type: 'button' }, children);
-    button.addEventListener('click', () => answerAndAdvance(question, choice.value));
-    group.append(button);
+    const node = el('button', { class: 'choice', type: 'button' }, children);
+    node.addEventListener('click', () => answerAndAdvance(question, choice.value));
+    group.append(node);
   }
 
   return group;
 }
 
 function renderNumber(question: Question): HTMLElement {
-  const wrapper = el('div');
-
   const input = el('input', {
     type: 'number',
     id: `q-${question.id}`,
     inputMode: question.kind === 'money' ? 'decimal' : 'numeric',
     min: String(question.min ?? 0),
     max: String(question.max ?? 999999),
+    step: question.kind === 'money' ? '0.01' : '1',
     // Nothing is pre-filled. A default that happens to be plausible is a
     // number the person never actually told us.
     value: '',
   });
 
-  const row = el('div', { class: 'field-row' }, [input]);
-  if (question.unit) row.append(el('span', { class: 'unit' }, [question.unit]));
+  const field = el('div', { class: 'field' }, [input]);
+  if (question.unit) field.append(el('span', { class: 'unit' }, [question.unit]));
 
-  const submit = el('button', { class: 'primary', type: 'submit' }, ['Pokračovať']);
-  const error = el('p', { class: 'help', role: 'alert' });
+  const error = el('p', { class: 'error', role: 'alert' });
+  const form = el('form', {}, [field, error]);
+  form.append(el('button', { class: 'primary', type: 'submit' }, ['Pokračovať']));
 
-  const form = el('form', {}, [row, error, submit]);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    const raw = input.value.trim();
-
-    if (raw === '') {
-      error.textContent = 'Zadajte číslo. Ak je to nula, napíšte 0.';
+    const checked = validateAnswer(question, input.value);
+    if (!checked.ok) {
+      error.textContent = checked.error;
       input.focus();
       return;
     }
-
-    const value = Number(raw);
-    const min = question.min ?? 0;
-    const max = question.max ?? Number.MAX_SAFE_INTEGER;
-
-    if (!Number.isFinite(value) || value < min || value > max) {
-      error.textContent = `Zadajte číslo medzi ${min} a ${max}.`;
-      input.focus();
-      return;
-    }
-
-    answerAndAdvance(question, value);
+    answerAndAdvance(question, checked.value);
   });
 
-  wrapper.append(form);
-  return wrapper;
+  return form;
 }
 
 function renderQuestion(question: Question): void {
-  clear();
   if (!root) return;
+  root.textContent = '';
 
-  const legend = el('legend', {}, [question.label]);
-  const parts: Node[] = [legend];
-
+  const parts: Node[] = [el('legend', {}, [question.label])];
   if (question.help) parts.push(el('p', { class: 'help' }, [question.help]));
   parts.push(question.kind === 'single-choice' ? renderChoice(question) : renderNumber(question));
 
-  const fieldset = el('fieldset', {}, parts);
-  root.append(renderProgress(), fieldset);
+  root.append(renderProgress(), el('fieldset', {}, parts), ...noticeLine());
 
+  const secondary = el('div', { class: 'actions no-print' }, [button('Späť', goBack, 'quiet')]);
   if (canScreen(answers)) {
-    const skip = el('button', { class: 'link', type: 'button' }, [
-      'Zvyšné otázky preskočiť a zobraziť výsledok',
-    ]);
-    skip.addEventListener('click', renderResult);
-    root.append(skip);
+    secondary.append(button('Preskočiť zvyšok a zobraziť výsledok', showResult, 'quiet'));
   }
+  root.append(secondary, fileActions());
 
   root.append(
-    el('p', { class: 'muted' }, [
+    el('p', { class: 'faint' }, [
       question.sensitive
         ? 'Táto otázka je nepovinná. Odpoveď zostáva vo vašom zariadení — nikam sa neposiela.'
-        : 'Odpovede zostávajú vo vašom zariadení. Nikam sa neposielajú a neukladajú.',
+        : 'Odpovede zostávajú vo vašom zariadení.',
     ]),
   );
 
   focusHeading();
 }
 
-function officeBlock(outcome: Outcome, documents: string[]): HTMLElement {
+function showResult(): void {
+  screen = 'result';
+  render();
+}
+
+function officeDetail(outcome: Outcome, documents: string[]): Node[] {
   const office = skOffices[outcome.office];
-  const items: Node[] = [
-    el('p', {}, [office.how]),
+  const parts: Node[] = [
+    el('p', {}, [el('strong', {}, [office.name]), document.createTextNode(` — ${office.how}`)]),
     el('p', { class: 'muted' }, [office.whichBranch]),
   ];
 
   if (documents.length > 0) {
-    const list = el('ul', {}, documents.map((doc) => el('li', {}, [doc])));
-    items.push(el('p', {}, ['Čo si vziať:']), list);
+    parts.push(
+      el('p', {}, ['Čo si vziať so sebou:']),
+      el('ul', {}, documents.map((doc) => el('li', {}, [doc]))),
+    );
   }
 
-  items.push(
-    el('p', {}, [
-      el('a', { href: office.locatorUrl, rel: 'noopener' }, ['Nájdite svoj úrad a kontakty']),
-    ]),
-  );
-
-  return el('div', { class: 'card' }, [el('h3', {}, [office.name]), ...items]);
+  parts.push(el('p', {}, [link(office.locatorUrl, 'Nájdite svoj úrad a kontakty')]));
+  return parts;
 }
 
 function renderResult(): void {
-  clear();
   if (!root) return;
+  root.textContent = '';
 
-  const situation = toSituation(answers, currentPeriod());
-  const report: Report = screenSk(situation);
+  const report: Report = screenSk(toSituation(answers, currentPeriod()));
 
-  root.append(el('h1', {}, ['Čo sme zistili']));
+  root.append(el('h1', {}, ['Čo sme zistili']), ...noticeLine());
 
-  // Entitlements, with the practical part attached.
   if (report.actionable.length > 0) {
     root.append(
-      el('h2', {}, ['Máte nárok']),
-      el('p', {}, [
-        `Dokopy približne ${report.totalMonthly.toFixed(2)} € mesačne. Výpočet je orientačný — rozhoduje úrad.`,
+      el('p', { class: 'amount' }, [money(report.totalMonthly)]),
+      el('p', { class: 'sum' }, [
+        'mesačne, podľa vašich odpovedí. Suma je orientačná — rozhoduje úrad.',
       ]),
+      el('h2', {}, ['Na toto máte nárok']),
     );
+
     for (const item of report.actionable) {
       root.append(
-        el('div', { class: 'card' }, [
-          el('h3', {}, [item.outcome.benefitName]),
-          el('p', {}, [`${(item.outcome.amountMonthly ?? 0).toFixed(2)} € mesačne`]),
+        el('div', { class: 'entry' }, [
+          el('p', { class: 'benefit' }, [item.outcome.benefitName]),
+          el('p', { class: 'muted' }, [
+            `${money(item.outcome.amountMonthly ?? 0)} mesačne · ${item.outcome.law}`,
+          ]),
+          ...officeDetail(item.outcome, item.documents),
         ]),
-        officeBlock(item.outcome, item.documents),
       );
     }
+  } else {
+    root.append(
+      el('p', { class: 'lede' }, [
+        'Z vašich odpovedí nám zatiaľ nevyšiel nárok, ktorý by sme vedeli spočítať. ' +
+          'To neznamená, že žiadny nemáte — nižšie je, čo stojí za to overiť.',
+      ]),
+    );
   }
 
   // The honest state of the rule base, stated plainly rather than hidden.
   const gated = report.outcomes.filter((o) => o.status === 'draft' || o.status === 'unverified');
   if (gated.length > 0) {
     root.append(
-      el('div', { class: 'notice' }, [
-        el('strong', {}, ['Tieto dávky vám ešte nedokážeme spočítať']),
-        document.createTextNode(
-          'Pravidlá a sumy pre ne zatiaľ neprešli kontrolou odborníka, takže vám ' +
-            'radšej nepovieme nič, než aby sme vám povedali nesprávne číslo. ' +
-            'Informovať sa o nich môžete priamo na úrade.',
-        ),
+      el('h2', {}, ['Toto vám zatiaľ nespočítame']),
+      el('p', {}, [
+        'Pravidlá a sumy pre tieto dávky ešte neprešli kontrolou odborníka. ' +
+          'Radšej vám nepovieme nič, než aby sme vám povedali nesprávne číslo. ' +
+          'Informovať sa o nich môžete priamo na úrade.',
       ]),
     );
     for (const outcome of gated) {
       root.append(
-        el('div', { class: 'card gated' }, [
-          el('h3', {}, [outcome.benefitName]),
+        el('div', { class: 'entry' }, [
+          el('p', { class: 'benefit' }, [outcome.benefitName]),
           el('p', { class: 'muted' }, [outcome.law]),
           el('p', {}, [
-            el('a', { href: skOffices[outcome.office].locatorUrl, rel: 'noopener' }, [
+            link(
+              skOffices[outcome.office].locatorUrl,
               `Informovať sa — ${skOffices[outcome.office].name}`,
-            ]),
+            ),
           ]),
         ]),
       );
@@ -266,101 +430,72 @@ function renderResult(): void {
     root.append(
       el('h2', {}, ['Na toto nám chýbajú údaje']),
       ...missing.map((outcome) =>
-        el('div', { class: 'card' }, [
-          el('h3', {}, [outcome.benefitName]),
+        el('div', { class: 'entry' }, [
+          el('p', { class: 'benefit' }, [outcome.benefitName]),
           el('p', { class: 'muted' }, [
-            'Nevieme posúdiť — niektoré potrebné údaje sme sa nepýtali alebo zostali nevyplnené.',
+            'Niektoré potrebné údaje sme sa nepýtali alebo zostali nevyplnené, ' +
+              'takže nárok nevieme posúdiť.',
           ]),
         ]),
       ),
     );
   }
 
-  // Leads. These need no verified amounts, so they are useful today.
+  // Leads need no verified amounts, so they are useful today.
   if (report.leads.length > 0) {
     root.append(el('h2', {}, ['Stojí za to overiť']));
     for (const lead of report.leads) {
       const parts: Node[] = [
+        el('p', { class: 'benefit' }, [lead.title]),
         el('p', {}, [lead.prompt]),
-        el('p', { class: 'because' }, [lead.because]),
+        el('p', { class: 'muted' }, [lead.because]),
       ];
-      if (lead.moreInfoUrl) {
-        parts.push(
-          el('p', {}, [
-            el('a', { href: lead.moreInfoUrl, rel: 'noopener' }, ['Viac informácií']),
-          ]),
-        );
-      }
-      root.append(el('div', { class: 'card lead' }, parts));
+      if (lead.moreInfoUrl) parts.push(el('p', {}, [link(lead.moreInfoUrl, 'Viac informácií')]));
+      root.append(el('div', { class: 'entry' }, parts));
     }
   }
 
-  const again = el('button', { class: 'primary', type: 'button' }, ['Začať odznova']);
-  again.addEventListener('click', () => {
-    for (const key of Object.keys(answers)) delete answers[key];
-    render();
-  });
-
   root.append(
-    again,
+    el('div', { class: 'actions actions-end no-print' }, [
+      button('Stiahnuť ako PDF', () => window.print()),
+      button('Uložiť odpovede (XML)', saveAnswers, 'quiet'),
+      button(
+        'Začať odznova',
+        () => {
+          answers = {};
+          order = [];
+          // Straight back to the first question rather than the landing page.
+          // Whoever has just read a result knows what this is; making them
+          // click through the pitch again would be friction for nothing.
+          screen = 'survey';
+          render();
+        },
+        'quiet',
+      ),
+    ]),
     el('footer', {}, [
-      el('p', { class: 'muted' }, [
-        'Toto nie je rozhodnutie úradu a nie je to právne poradenstvo. ' +
+      el('p', {}, [
+        'Toto nie je rozhodnutie úradu ani právne poradenstvo. ' +
           'O nároku rozhoduje príslušný úrad na základe vašej žiadosti a dokladov.',
       ]),
-      el('p', { class: 'muted' }, [
+      el('p', {}, [
         'Vaše odpovede neopustili toto zariadenie. Neposielame ich na server ' +
           'a neukladáme ich.',
       ]),
+      el('p', {}, [`Pravidlá verzia ${skRulePackVersion}.`]),
     ]),
   );
 
   focusHeading();
 }
-
-function renderIntro(): void {
-  clear();
-  if (!root) return;
-
-  const start = el('button', { class: 'primary', type: 'button' }, ['Začať']);
-  start.addEventListener('click', () => {
-    started = true;
-    render();
-  });
-
-  root.append(
-    el('h1', {}, ['Na čo máte nárok']),
-    el('p', { class: 'lede' }, [
-      'Niekoľko otázok a zistíte, ktoré sociálne dávky sa na vás môžu ' +
-        'vzťahovať, koľko to je a kde o ne požiadať.',
-    ]),
-    el('p', {}, [
-      'Otázok je málo — pýtame sa len to, čo pri vašej situácii naozaj ' +
-        'rozhoduje. Kto nemá deti, nedostane ani jednu otázku o deťoch.',
-    ]),
-    start,
-    el('p', { class: 'muted' }, [
-      'Nepotrebujeme meno ani e-mail. Odpovede zostávajú vo vašom zariadení — ' +
-        'výpočet beží priamo v prehliadači a nikam sa neposiela.',
-    ]),
-  );
-
-  focusHeading();
-}
-
-let started = false;
 
 function render(): void {
-  if (!started) {
-    renderIntro();
-    return;
-  }
+  if (screen === 'intro') return renderIntro();
+  if (screen === 'result') return renderResult();
+
   const question = nextQuestion(answers);
-  if (question) {
-    renderQuestion(question);
-    return;
-  }
-  renderResult();
+  if (question) return renderQuestion(question);
+  return renderResult();
 }
 
 render();

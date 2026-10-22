@@ -215,6 +215,7 @@ describe('ordering and totals', () => {
 describe('leads', () => {
   const lead: Registry['leads'][number] = {
     id: 'l1',
+    title: 'A lead',
     prompt: 'check this',
     because: 'reason',
     office: 'upsvar',

@@ -284,6 +284,73 @@ export function repeatedId(baseId: string, index: number): string {
 }
 
 /**
+ * The definition behind an id, repeated instances included.
+ *
+ * Needed when an answer arrives without the flow that produced it — from a
+ * saved file — because the bounds and choices to check it against live on the
+ * base question, not on the instance.
+ */
+export function baseQuestionFor(id: string): Question | undefined {
+  const separator = id.indexOf('__');
+  const base = separator === -1 ? id : id.slice(0, separator);
+  return skQuestions.find((q) => q.id === base);
+}
+
+export type Validation = { ok: true; value: AnswerValue } | { ok: false; error: string };
+
+/**
+ * Check one answer against its question.
+ *
+ * Shared by the typed-in path and the loaded-from-file path on purpose. An
+ * answer restored from a file somebody hand-edited has to clear exactly the
+ * same bar as one tapped on the screen, or the engine ends up computing an
+ * entitlement from a number the interface would have refused.
+ */
+export function validateAnswer(question: Question, raw: unknown): Validation {
+  if (question.kind === 'single-choice' || question.kind === 'boolean') {
+    const allowed = (question.choices ?? []).map((c) => c.value);
+    if (typeof raw === 'string' && allowed.includes(raw)) return { ok: true, value: raw };
+    return { ok: false, error: 'Vyberte jednu z možností.' };
+  }
+
+  // Slovak writes decimals with a comma, and a phone keypad offers whichever
+  // separator it feels like. Both are the same number.
+  const text = typeof raw === 'number' ? String(raw) : String(raw ?? '').trim().replace(',', '.');
+  if (text === '') return { ok: false, error: 'Zadajte číslo. Ak je to nula, napíšte 0.' };
+
+  const value = Number(text);
+  if (!Number.isFinite(value)) return { ok: false, error: 'Zadajte číslo. Ak je to nula, napíšte 0.' };
+
+  const min = question.min ?? 0;
+  const max = question.max ?? Number.MAX_SAFE_INTEGER;
+  if (value < min || value > max) {
+    return { ok: false, error: `Zadajte číslo medzi ${min} a ${max}.` };
+  }
+  if (question.kind === 'number' && !Number.isInteger(value)) {
+    return { ok: false, error: 'Zadajte celé číslo.' };
+  }
+
+  return { ok: true, value };
+}
+
+/**
+ * Drop answers to questions that are not relevant any more.
+ *
+ * Two ways to get here: a person goes back and changes "do you have children"
+ * from two to none, or a saved file carries answers that contradict each other.
+ * Either way, leaving them in means the engine reads a fact the current answers
+ * do not support.
+ */
+export function pruneIrrelevant(answers: Answers): Answers {
+  const kept: Answers = {};
+  const relevant = new Set(relevantQuestions(answers).map((q) => q.id));
+  for (const [id, value] of Object.entries(answers)) {
+    if (relevant.has(id)) kept[id] = value;
+  }
+  return kept;
+}
+
+/**
  * A repeated question becomes one concrete question per child; everything
  * downstream — ordering, progress, completeness — then treats them as ordinary
  * questions and needs to know nothing about repetition.

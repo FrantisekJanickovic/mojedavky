@@ -16,15 +16,24 @@ What is done:
 - two Slovak benefits as drafts, with real legal references
 - "where and how to claim" with documents to bring, per benefit
 - "below the line" prompts for entitlements the engine cannot decide
+- the fact register, which fails the build when questions and rules disagree
 - the question graph: asks what eliminates, skips what cannot matter
-- the browser app, 24 kB, no framework, nothing stored
-- 156 tests, type-checked, built and smoke-tested on every push
+- the browser app, 32 kB, no framework, nothing stored: landing page, one
+  question per screen, result with offices and documents
+- answers saved to and loaded from a readable XML file, revalidated on the way
+  back in
+- the result prints to PDF through the browser, with no library and no font to
+  download
+- 175 tests, type-checked, built and smoke-tested on every push
 
 What is not:
 
 - every parameter is `verified: false` and several are literal placeholders
 - both benefits are `maturity: 'draft'`
-- no filled-in PDF to take to the office yet
+- no pre-filled official form to hand over the counter yet — printing the
+  result is not the same thing
+- residence and cross-border status is not modelled at all, and the authority's
+  own form asks for it
 - no batch screening for municipalities yet
 
 ## Why there is no OpenFisca here
@@ -142,7 +151,7 @@ src/
 └── index.ts          screenSk()
 web/index.html        page shell, styles inline
 scripts/              rule compiler, build, post-deploy checks
-tests/                156 tests
+tests/                175 tests
 ```
 
 Numbers in YAML, logic in TypeScript. The amounts change yearly by decree and
@@ -161,7 +170,7 @@ Separate packages also mean a Czech mistake cannot break Slovakia.
 ```bash
 npm install
 npm run rules     # validate the YAML and compile the rule pack
-npm test          # 156 tests
+npm test          # 175 tests
 npm run typecheck
 npm run build     # static site into dist/, with a size budget
 npm run verify    # all of the above, in order

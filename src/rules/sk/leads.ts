@@ -18,6 +18,7 @@ const children = (s: Situation) => s.persons.filter((p) => p.role === 'child');
 export const skLeads: LeadRule[] = [
   {
     id: 'sk-predlzeny-rodicovsky',
+    title: 'Predĺžený rodičovský príspevok',
     prompt:
       'Ak máte dlhodobo nepriaznivý zdravotný stav dieťaťa potvrdený posudkom, overte si nárok na predĺžený rodičovský príspevok.',
     because: 'V domácnosti je dieťa s potvrdeným dlhodobo nepriaznivým zdravotným stavom.',
@@ -28,6 +29,7 @@ export const skLeads: LeadRule[] = [
   },
   {
     id: 'sk-tzp-kompenzacie',
+    title: 'Príspevky na kompenzáciu ŤZP',
     prompt:
       'Pri preukaze ŤZP existuje samostatná skupina peňažných príspevkov na kompenzáciu — na osobnú asistenciu, na kúpu pomôcky, na prepravu a ďalšie. Posudzujú sa jednotlivo a nie sú súčasťou tohto prehľadu.',
     because: 'Niekto v domácnosti má preukaz ŤZP.',
@@ -38,6 +40,7 @@ export const skLeads: LeadRule[] = [
   },
   {
     id: 'sk-danovy-bonus',
+    title: 'Daňový bonus na dieťa',
     prompt:
       'Ak máte zdaniteľný príjem a dieťa, overte si daňový bonus na dieťa. Nevybavuje sa na úrade práce, ale cez zamestnávateľa alebo v daňovom priznaní.',
     because: 'V domácnosti je dieťa a aspoň jedna osoba s príjmom.',
@@ -48,6 +51,7 @@ export const skLeads: LeadRule[] = [
   },
   {
     id: 'sk-byvanie-tesne-nad',
+    title: 'Prepočet nároku na príspevok na bývanie',
     prompt:
       'Váš príjem je blízko hranice hmotnej núdze a bývanie vás stojí značnú časť príjmu. Stojí za to dať si nárok prepočítať na úrade — do príjmu sa niektoré položky nezapočítavajú a hranica sa môže posunúť.',
     because:
@@ -69,6 +73,7 @@ export const skLeads: LeadRule[] = [
   },
   {
     id: 'sk-nezamestnany-neevidovany',
+    title: 'Evidencia na úrade práce',
     prompt:
       'Ak ste bez práce a nie ste evidovaný na úrade práce, evidencia je podmienkou viacerých dávok aj platenia zdravotného poistenia štátom. Oplatí sa ju vybaviť aj vtedy, keď na podporu nárok nemáte.',
     because: 'Dospelá osoba bez príjmu, ktorá nie je evidovaná ako uchádzač o zamestnanie.',

@@ -23,6 +23,15 @@ import { NoValueForPeriodError, type ParameterTable } from './parameters.js';
 
 export interface LeadRule {
   id: string;
+  /**
+   * What the lead is about, in two or three words.
+   *
+   * A result page can carry half a dozen of these. Without a name each one is
+   * an untitled paragraph, and a list of untitled paragraphs is a list nobody
+   * reads to the end — which costs most on exactly the entitlements people did
+   * not know existed.
+   */
+  title: string;
   prompt: string;
   because: string;
   office: Lead['office'];
@@ -99,6 +108,7 @@ export function screen(
 
     const lead: Lead = {
       id: rule.id,
+      title: rule.title,
       prompt: rule.prompt,
       because: rule.because,
       office: rule.office,

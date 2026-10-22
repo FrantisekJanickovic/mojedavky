@@ -8,38 +8,42 @@
 <meta name="color-scheme" content="light dark" />
 
 <!--
-  Everything the first screen needs is inline. The audience for this includes
-  people on old phones and metered mobile data, where a second request for a
-  stylesheet is a visible delay. The whole page is a few kilobytes.
+  Everything the first screen needs is inline. The audience includes people on
+  old phones and metered data, where a second request for a stylesheet is a
+  visible delay.
+
+  No web font. A display serif from Google would cost a request to a third
+  party and hand them the visitor's IP address — on a page whose whole promise
+  is that nothing leaves the device. Georgia is on effectively every device,
+  carries full Slovak diacritics, and costs nothing.
 -->
 <style>
   :root {
-    --bg: #fbfbf9;
-    --surface: #ffffff;
-    --ink: #1a1a18;
-    --ink-soft: #5c5c57;
-    --line: #e2e2dc;
-    --accent: #1f5c3d;
-    --accent-ink: #ffffff;
-    --warn-bg: #fdf6e3;
-    --warn-line: #d9b64e;
-    --info-bg: #eef4f8;
-    --info-line: #7aa7c7;
-    --radius: 10px;
+    /* Paper, ink, and the blue of an official stamp. */
+    --paper: #fcfcfa;
+    --ink: #1c2435;
+    --ink-soft: #5a6477;
+    --ink-faint: #8a93a3;
+    --stamp: #27389e;
+    --stamp-ink: #ffffff;
+    --choice: #f0f0ec;
+    --choice-hover: #e4e5df;
+    --rule: #e6e6e1;
+
+    --display: Georgia, "Noto Serif", "Times New Roman", serif;
+    --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #16161a;
-      --surface: #1e1e23;
-      --ink: #ededea;
-      --ink-soft: #a8a8a2;
-      --line: #32323a;
-      --accent: #5fbd8c;
-      --accent-ink: #12120f;
-      --warn-bg: #2a2416;
-      --warn-line: #8a6f22;
-      --info-bg: #17222b;
-      --info-line: #3f6d8e;
+      --paper: #14161c;
+      --ink: #e8eaef;
+      --ink-soft: #a3abbb;
+      --ink-faint: #737c8c;
+      --stamp: #93a4ff;
+      --stamp-ink: #12141a;
+      --choice: #1e2129;
+      --choice-hover: #272b35;
+      --rule: #2a2e39;
     }
   }
 
@@ -47,103 +51,202 @@
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
-    background: var(--bg);
+    background: var(--paper);
     color: var(--ink);
-    font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 17px/1.6 var(--ui);
   }
-  main { max-width: 36rem; margin: 0 auto; padding: 24px 16px 64px; }
 
-  h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 8px; }
-  h2 { font-size: 1.15rem; margin: 32px 0 12px; }
-  h3 { font-size: 1rem; margin: 0 0 4px; }
-  p { margin: 0 0 14px; }
-  .lede { color: var(--ink-soft); margin-bottom: 28px; }
-  .muted { color: var(--ink-soft); font-size: 0.9rem; }
+  main {
+    max-width: 34rem;
+    margin: 0 auto;
+    padding: 72px 20px 96px;
+  }
 
-  /* Progress — counts only relevant questions, so it never stalls. */
-  .bar { height: 5px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 0 0 24px; }
-  .bar > i { display: block; height: 100%; background: var(--accent); transition: width 0.25s ease; }
+  /* --- Progress: full-bleed hairline, not a widget in the content. -------
+     It adapts. Answering "yes, I have children" opens more questions, the
+     denominator grows and the bar retreats — which is the truth, so it is
+     allowed to show. The transition makes it read as "the path got longer"
+     rather than as lost work. */
+  .progress {
+    position: fixed; inset: 0 0 auto 0; height: 3px;
+    background: var(--rule); z-index: 10;
+  }
+  .progress > i {
+    display: block; height: 100%; background: var(--stamp);
+    transition: width 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .progress > i { transition: none; }
+  }
+
+  /* --- Type ------------------------------------------------------------- */
+  h1, h2, legend, .amount, .benefit {
+    font-family: var(--display);
+    font-weight: 400;
+  }
+  h1 {
+    font-size: clamp(2rem, 1.4rem + 2.6vw, 2.75rem);
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    margin: 0 0 20px;
+  }
+  legend {
+    font-size: clamp(1.6rem, 1.2rem + 2vw, 2.1rem);
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    padding: 0;
+    margin: 0 0 16px;
+  }
+  h2 {
+    font-size: 1.35rem;
+    line-height: 1.3;
+    margin: 64px 0 20px;
+  }
+  .benefit { font-size: 1.25rem; margin: 0 0 2px; }
+  p { margin: 0 0 16px; max-width: 34em; }
+  .lede { font-size: 1.1rem; color: var(--ink-soft); margin-bottom: 36px; }
+  .help { color: var(--ink-soft); margin: 0 0 32px; }
+  .muted { color: var(--ink-soft); font-size: 0.92rem; }
+  .faint { color: var(--ink-faint); font-size: 0.88rem; }
+
+  /* The one bold moment in the whole product. */
+  .amount {
+    font-size: clamp(3rem, 2rem + 6vw, 4.5rem);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    margin: 0 0 8px;
+    color: var(--stamp);
+  }
 
   fieldset { border: 0; padding: 0; margin: 0; }
-  legend { font-size: 1.25rem; font-weight: 600; line-height: 1.3; padding: 0; margin: 0 0 6px; }
-  .help { color: var(--ink-soft); font-size: 0.93rem; margin: 0 0 18px; }
 
-  .choices { display: grid; gap: 10px; }
+  /* --- Controls. No frames anywhere: a choice is a filled surface, never
+     an outlined box. ------------------------------------------------------ */
+  .choices { display: grid; gap: 8px; margin: 0 0 8px; }
   .choice {
     display: block; width: 100%; text-align: left;
-    padding: 14px 16px; border: 1.5px solid var(--line); border-radius: var(--radius);
-    background: var(--surface); color: inherit; font: inherit; cursor: pointer;
-    /* 44px minimum touch target. */
-    min-height: 48px;
+    padding: 18px 20px; min-height: 56px;
+    background: var(--choice); color: inherit;
+    border: 0; border-radius: 6px;
+    font: inherit; cursor: pointer;
+    transition: background 140ms ease;
   }
-  .choice:hover { border-color: var(--accent); }
-  .choice:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .choice:hover { background: var(--choice-hover); }
   .choice b { display: block; font-weight: 600; }
-  .choice span { display: block; color: var(--ink-soft); font-size: 0.9rem; margin-top: 2px; }
+  .choice span { display: block; color: var(--ink-soft); font-size: 0.92rem; margin-top: 3px; }
 
+  /* A line to write on, the way a paper form has one. The rule along the
+     bottom is the affordance that says "type here" — without it a filled
+     field reads as disabled — and it encloses nothing, so it is not a box. */
+  .field { display: flex; gap: 12px; align-items: baseline; margin: 0 0 8px; }
   input[type="number"] {
-    width: 100%; padding: 14px 16px; font: inherit; color: inherit;
-    background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius);
-    min-height: 48px;
+    flex: 1 1 auto; min-width: 0;
+    padding: 14px 4px; min-height: 56px;
+    font-family: var(--display); font-size: 1.6rem; color: inherit;
+    background: none; border: 0;
+    border-bottom: 2px solid var(--ink-faint);
+    border-radius: 0;
+    transition: border-color 140ms ease;
   }
-  input[type="number"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  .field-row { display: flex; gap: 10px; align-items: stretch; }
-  .unit { display: flex; align-items: center; color: var(--ink-soft); }
+  input[type="number"]:focus { border-bottom-color: var(--stamp); outline: none; }
+  input[type="number"]:focus-visible { outline: none; }
+  /* The spinners add nothing: the bounds are enforced on submit and the
+     keypad is already numeric. */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { appearance: none; margin: 0; }
+  input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+  .unit { color: var(--ink-soft); flex: 0 0 auto; }
+
+  .error { color: var(--stamp); margin: 0 0 8px; min-height: 1.6em; }
 
   button.primary {
-    margin-top: 18px; padding: 14px 20px; min-height: 48px;
-    background: var(--accent); color: var(--accent-ink);
-    border: 0; border-radius: var(--radius); font: inherit; font-weight: 600; cursor: pointer;
+    display: block; width: 100%;
+    margin: 24px 0 0; padding: 18px 24px; min-height: 56px;
+    background: var(--stamp); color: var(--stamp-ink);
+    border: 0; border-radius: 6px;
+    font: inherit; font-size: 1.05rem; font-weight: 600;
+    cursor: pointer;
   }
-  button.primary:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
-  button.link {
-    background: none; border: 0; padding: 8px 0; color: var(--accent);
-    font: inherit; text-decoration: underline; cursor: pointer; min-height: 44px;
+  button.primary:hover { filter: brightness(1.08); }
+  /* The line under a button is a caption, not the next paragraph. */
+  button.primary + p { margin-top: 12px; }
+
+  button.quiet {
+    background: none; border: 0; padding: 10px 0; margin: 0;
+    color: var(--stamp); font: inherit; cursor: pointer;
+    text-decoration: underline; text-underline-offset: 3px;
+    min-height: 44px;
   }
 
-  .card {
-    background: var(--surface); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 16px; margin: 0 0 14px;
-  }
-  .card.gated { border-left: 4px solid var(--warn-line); background: var(--warn-bg); }
-  .card.lead { border-left: 4px solid var(--info-line); background: var(--info-bg); }
-  .card .because { color: var(--ink-soft); font-size: 0.9rem; margin: 8px 0 0; }
-  .card ul { margin: 10px 0 0; padding-left: 20px; }
-  .card li { margin: 0 0 4px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 20px; margin: 16px 0 0; }
+  .actions-end { margin-top: 56px; }
+  .actions-end button.primary { margin-top: 0; }
 
-  .notice {
-    border: 1px solid var(--warn-line); background: var(--warn-bg);
-    border-radius: var(--radius); padding: 16px; margin: 0 0 24px;
-  }
-  .notice strong { display: block; margin-bottom: 4px; }
+  :focus-visible { outline: 3px solid var(--stamp); outline-offset: 3px; }
+  /* Each step moves focus to its heading so a screen reader announces it.
+     Nobody reaches these by tabbing, so the ring would be a box drawn around
+     the heading for no one's benefit. */
+  [tabindex="-1"]:focus, [tabindex="-1"]:focus-visible { outline: none; }
 
-  a { color: var(--accent); }
+  /* --- Result sections: separated by space and type, never by borders. --- */
+  .entry { margin: 0 0 40px; }
+  .entry p:last-child { margin-bottom: 0; }
+  .sum { color: var(--ink-soft); }
+  ul { margin: 0 0 16px; padding-left: 1.2em; }
+  li { margin: 0 0 6px; }
+  a { color: var(--stamp); text-underline-offset: 3px; }
+
+  dl { margin: 0 0 16px; }
+  dt { font-weight: 600; margin: 16px 0 2px; }
+  dd { margin: 0; color: var(--ink-soft); }
+
   .sr-only {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
-  footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); }
+  footer { margin-top: 72px; color: var(--ink-faint); font-size: 0.88rem; }
+  footer p { margin-bottom: 10px; }
+
+  /* --- Print: this IS the PDF. -------------------------------------------
+     A generated PDF would mean bundling a library and a Unicode font — some
+     three hundred kilobytes, paid for by every visitor including the ones on
+     metered data — to produce something worse than this. Printed from the
+     browser the text stays real text, selectable and searchable, the Slovak
+     diacritics are the system's own, and the page breaks where it should. */
+  @media print {
+    :root {
+      --paper: #ffffff; --ink: #000000; --ink-soft: #333333;
+      --ink-faint: #555555; --stamp: #000000; --rule: #999999;
+    }
+    body { font-size: 11pt; }
+    main { max-width: none; padding: 0; }
+    .progress, .no-print, button { display: none !important; }
+    h2 { margin-top: 28pt; page-break-after: avoid; }
+    .entry { page-break-inside: avoid; margin-bottom: 18pt; }
+    .amount { font-size: 28pt; }
+    a { text-decoration: none; }
+    a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 9pt; color: #555; }
+  }
 </style>
 </head>
 <body>
 <main id="app">
   <!--
-    Server-rendered fallback. If the script fails — old browser, blocked JS,
-    flaky connection — the visitor still gets the one thing that costs nothing
-    to state: that the money exists and where to ask about it.
+    Fallback for a browser that does not run the script. The visitor still gets
+    the one thing that costs nothing to state: that the money exists, that
+    nobody hands it out unasked, and where to go.
   -->
   <h1>Na čo máte nárok</h1>
   <p class="lede">
-    Odpovedzte na niekoľko otázok a zistíte, ktoré sociálne dávky sa na vás
-    môžu vzťahovať a kde o ne požiadať.
+    Štát vypláca dávky, o ktoré treba požiadať. Sami od seba neprídu.
   </p>
-  <div class="notice">
-    <strong>Aplikácia sa nespustila</strong>
-    Potrebuje zapnutý JavaScript. Bez neho vám poradiť nedokážeme — ale
-    o ktorúkoľvek štátnu sociálnu dávku sa môžete informovať na úrade práce,
-    sociálnych vecí a rodiny podľa miesta trvalého pobytu.
-    <a href="https://www.upsvr.gov.sk/kontakty/">Kontakty na úrady</a>
-  </div>
+  <p>
+    <strong>Aplikácia sa nespustila.</strong> Potrebuje zapnutý JavaScript.
+    Bez neho vám poradiť nedokážeme — ale o ktorúkoľvek štátnu sociálnu dávku
+    sa môžete informovať na úrade práce, sociálnych vecí a rodiny podľa miesta
+    vášho trvalého pobytu.
+  </p>
+  <p><a href="https://www.upsvr.gov.sk/kontakty/">Kontakty na úrady práce</a></p>
 </main>
 <script type="module" src="/app.js"></script>
 </body>

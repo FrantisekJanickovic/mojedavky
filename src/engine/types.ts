@@ -140,6 +140,8 @@ export interface Outcome {
  */
 export interface Lead {
   id: string;
+  /** What this is about, in two or three words. */
+  title: string;
   /** What to tell the person, in their own terms. */
   prompt: string;
   /** Why this was surfaced, so it never looks arbitrary. */
